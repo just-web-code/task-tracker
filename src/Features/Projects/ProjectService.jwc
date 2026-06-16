@@ -24,24 +24,15 @@ dome ProjectService {
         return select Project from AppDb.Project where Project.id == @id first;
     }
 
-    // Project + boards + columns. 0.4.9: `select Board with columns` materialises
-    // every board's columns in a single json_agg nav query — replaces the
-    // per-board column N+1. (Nav collections aren't orderable yet, so column
-    // order within a board is unspecified — see PAIN_LOG2.)
+    // Project + boards + columns in ONE statement: two-level nested eager-load
+    // `with boards.columns` collapses the project root, its boards, and each
+    // board's columns into a single query (was: a separate boards-with-columns
+    // select). Board + column ordering come from the nav declarations'
+    // `orderby position asc`, so the materialised tree is deterministic.
     function detail(p) {
         let pid = p.id;
-        let boards = select Board with columns from AppDb.Board
-            where Board.projectId == @pid
-            orderby Board.position asc;
-
-        return {
-            id:          p.id,
-            workspaceId: p.workspaceId,
-            name:        p.name,
-            description: p.description,
-            createdAt:   p.createdAt,
-            boards:      boards
-        };
+        return select Project with boards.columns from AppDb.Project
+            where Project.id == @pid first;
     }
 
     // 0.4.9: a typed `class` param no longer forces every field present (partial

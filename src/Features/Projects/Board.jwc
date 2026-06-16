@@ -3,7 +3,7 @@ entity Board of AppDb {
     projectId int;
     name      varchar(150);
     position  int;
-    columns: List<Column> via Column.boardId;
+    columns: List<Column> via Column.boardId orderby position asc;
 }
 
 class CreateBoardRequest {

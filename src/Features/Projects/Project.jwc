@@ -4,7 +4,7 @@ entity Project of AppDb {
     name        varchar(150);
     description varchar(2000);
     createdAt   datetime;
-    boards: List<Board> via Board.projectId;
+    boards: List<Board> via Board.projectId orderby position asc;
 }
 
 class CreateProjectRequest {
