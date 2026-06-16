@@ -84,52 +84,18 @@ dome TaskService {
         return t;
     }
 
-    // Filter + pagination. With no filter we page entirely DB-side: 0.4.9 binds
-    // dynamic `limit @x offset @y` reliably and `select count(*)` gives the
-    // total without fetching rows. Optional/dynamic `where` composition still
-    // isn't expressible (PAIN_LOG2), so an active status/priority filter falls
-    // back to fetch-then-filter in code.
+    // Filter + pagination, fully DB-side. Query Layer `==?` drops the
+    // status/priority predicate when the value is "" (no filter), so a single
+    // static query covers every filter combination — no in-code branch or fetch
+    // (was the last in-code-filter workaround). count(*) + bound limit/offset.
     function listByProject(projectId: int, status: string, priority: string, page: int, pageSize: int) {
         let off = (page - 1) * pageSize;
-
-        if (status == "" and priority == "") {
-            let total = select count(*) from AppDb.Task where Task.projectId == @projectId;
-            let items = select Task from AppDb.Task
-                where Task.projectId == @projectId
-                orderby Task.position asc
-                limit @pageSize offset @off;
-            return { page: page, pageSize: pageSize, total: total, items: items };
-        }
-
-        let all = select Task from AppDb.Task
-            where Task.projectId == @projectId
-            orderby Task.position asc;
-
-        let filtered = [];
-        for t in all {
-            let keep = true;
-            if (status != "" and t.status != status) {
-                keep = false;
-            }
-            if (priority != "" and t.priority != priority) {
-                keep = false;
-            }
-            if (keep) {
-                push(filtered, t);
-            }
-        }
-
-        let total = length(filtered);
-        let end = off + pageSize;
-        let items = [];
-        let idx = 0;
-        for t in filtered {
-            if (idx >= off and idx < end) {
-                push(items, t);
-            }
-            idx = idx + 1;
-        }
-
+        let total = select count(*) from AppDb.Task
+            where Task.projectId == @projectId and Task.status ==? @status and Task.priority ==? @priority;
+        let items = select Task from AppDb.Task
+            where Task.projectId == @projectId and Task.status ==? @status and Task.priority ==? @priority
+            orderby Task.position asc
+            limit @pageSize offset @off;
         return {
             page:     page,
             pageSize: pageSize,
