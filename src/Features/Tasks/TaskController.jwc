@@ -120,7 +120,7 @@ route POST "/tasks/{id}/move" use Auth {
     if (targetBoard.projectId != t.projectId) {
         return badRequest({ error: "cannot move task across projects" });
     }
-    let updated = TaskService.move(id, req.columnId, req.position);
+    let updated = TaskService.move(id, t.columnId, t.position, req.columnId, req.position);
     ActivityService.record(t.projectId, userId, "task.moved", { taskId: id, toColumn: req.columnId });
     return json(updated);
 }

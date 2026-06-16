@@ -1,7 +1,8 @@
 dome TaskService {
     function create(columnId: int, projectId: int, createdById: int, req) {
         // 0.4.9: scalar count(*) is reliable — no need to fetch the whole column
-        // just to size it. (Append-only; reorder still needs renumbering.)
+        // just to size it. New tasks append at the end; `move` handles
+        // in-place renumbering atomically.
         let n = select count(*) from AppDb.Task where Task.columnId == @columnId;
         let pos = n + 1;
 
@@ -72,16 +73,35 @@ dome TaskService {
         return t;
     }
 
-    function move(id: int, columnId: int, position: int) {
-        let t = select Task from AppDb.Task where Task.id == @id first;
-        if (t == null) {
-            return null;
+    // Reorder/move, fully atomic — no load-modify-save (closes the lost-update
+    // window of the old whole-row `update t in`). Positions are renumbered
+    // in-place with `set position = position +/- 1` (D3 column arithmetic), so
+    // ordering stays gap-free. Same-column drag shifts only the span between the
+    // old and new slot; a cross-column move closes the gap in the source column
+    // and opens one in the target.
+    function move(id, oldColumnId, oldPosition, newColumnId, newPosition) {
+        if (oldColumnId == newColumnId) {
+            if (newPosition > oldPosition) {
+                update AppDb.Task set position = position - 1
+                    where Task.columnId == @newColumnId
+                      and Task.position > @oldPosition
+                      and Task.position <= @newPosition;
+            }
+            if (newPosition < oldPosition) {
+                update AppDb.Task set position = position + 1
+                    where Task.columnId == @newColumnId
+                      and Task.position >= @newPosition
+                      and Task.position < @oldPosition;
+            }
+        } else {
+            update AppDb.Task set position = position - 1
+                where Task.columnId == @oldColumnId and Task.position > @oldPosition;
+            update AppDb.Task set position = position + 1
+                where Task.columnId == @newColumnId and Task.position >= @newPosition;
         }
-        t.columnId = columnId;
-        t.position = position;
-        t.updatedAt = now();
-        update t in AppDb.Task;
-        return t;
+        update AppDb.Task set columnId = newColumnId, position = newPosition, updatedAt = now()
+            where Task.id == @id;
+        return select Task from AppDb.Task where Task.id == @id first;
     }
 
     // Filter + pagination, fully DB-side. Query Layer `==?` drops the
