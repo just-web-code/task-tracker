@@ -1,0 +1,6 @@
+/target
+/bin
+.jwc-build/
+node_modules/
+.env
+*.log

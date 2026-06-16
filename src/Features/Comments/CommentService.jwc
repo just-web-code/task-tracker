@@ -1,0 +1,28 @@
+dome CommentService {
+    function create(taskId: int, authorId: int, body: string) {
+        let c = new Comment();
+        c.taskId = taskId;
+        c.authorId = authorId;
+        c.body = body;
+        c.createdAt = now();
+        insert c into AppDb.Comment;
+        return c;
+    }
+
+    // Query Layer: DB-side paging (count(*) + bound limit/offset) and
+    // `with author` — the belongs-to nav eager-loads each comment's author
+    // (projected to id/email/name, no passwordHash) in one query. No N+1.
+    function listByTask(taskId: int, limit: int, offset: int) {
+        let total = select count(*) from AppDb.Comment where Comment.taskId == @taskId;
+        let items = select Comment with author from AppDb.Comment
+            where Comment.taskId == @taskId
+            orderby Comment.createdAt asc
+            limit @limit offset @offset;
+        return {
+            items:  items,
+            limit:  limit,
+            offset: offset,
+            total:  total
+        };
+    }
+}

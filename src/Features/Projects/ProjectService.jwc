@@ -1,0 +1,78 @@
+dome ProjectService {
+    function create(workspaceId: int, name: string, description: string) {
+        let p = new Project();
+        p.workspaceId = workspaceId;
+        p.name = name;
+        p.description = description;
+        p.createdAt = now();
+        insert p into AppDb.Project;
+        return p;
+    }
+
+    function listByWorkspace(workspaceId: int, limit: int, offset: int) {
+        // 0.4.9: DB-side paging — count(*) for the total, bound limit/offset for
+        // the page. No full-table fetch.
+        let total = select count(*) from AppDb.Project where Project.workspaceId == @workspaceId;
+        let items = select Project from AppDb.Project
+            where Project.workspaceId == @workspaceId
+            orderby Project.createdAt asc
+            limit @limit offset @offset;
+        return { items: items, limit: limit, offset: offset, total: total };
+    }
+
+    function getById(id: int): Project? {
+        return select Project from AppDb.Project where Project.id == @id first;
+    }
+
+    // Project + boards + columns. 0.4.9: `select Board with columns` materialises
+    // every board's columns in a single json_agg nav query — replaces the
+    // per-board column N+1. (Nav collections aren't orderable yet, so column
+    // order within a board is unspecified — see PAIN_LOG2.)
+    function detail(p) {
+        let pid = p.id;
+        let boards = select Board with columns from AppDb.Board
+            where Board.projectId == @pid
+            orderby Board.position asc;
+
+        return {
+            id:          p.id,
+            workspaceId: p.workspaceId,
+            name:        p.name,
+            description: p.description,
+            createdAt:   p.createdAt,
+            boards:      boards
+        };
+    }
+
+    // 0.4.9: a typed `class` param no longer forces every field present (partial
+    // PATCH), and `update <var> in` accepts the select-loaded row. So PATCH takes
+    // the DTO directly: load → set the fields that were sent → update → return.
+    function update(id: int, req: UpdateProjectRequest) {
+        let p = select Project from AppDb.Project where Project.id == @id first;
+        if (p == null) {
+            return null;
+        }
+        if (req.name != null) {
+            p.name = req.name;
+        }
+        if (req.description != null) {
+            p.description = req.description;
+        }
+        update p in AppDb.Project;
+        return p;
+    }
+
+    // Manual cascade: no FK on-delete-cascade declared, so wipe the subtree
+    // in one transaction (pain log #5 — multi-step atomic write).
+    function deleteDeep(projectId: int) {
+        transaction {
+            let boards = select Board from AppDb.Board where Board.projectId == @projectId;
+            for b in boards {
+                let bid = b.id;
+                delete from AppDb.Column where Column.boardId == @bid;
+            }
+            delete from AppDb.Board where Board.projectId == @projectId;
+            delete from AppDb.Project where Project.id == @projectId;
+        }
+    }
+}

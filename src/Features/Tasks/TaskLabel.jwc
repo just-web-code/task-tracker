@@ -1,0 +1,8 @@
+// Join table: Task <-> Label (N-N). Surrogate id pk; uniqueness of
+// (taskId, labelId) is enforced in app code (addLabel dedups) since composite
+// pk wasn't exercised here.
+entity TaskLabel of AppDb {
+    id      int pk autoincrement;
+    taskId  int;
+    labelId int;
+}

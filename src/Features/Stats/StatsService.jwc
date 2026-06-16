@@ -1,0 +1,38 @@
+// Query Layer status: single-entity grouped aggregation is native now
+// (`select { status, total: count(*) } group by status`), so `byStatus` no
+// longer needs raw_sql. `byColumn` / `byAssignee` still drop to raw_sql: they
+// count over a JOIN (task→column for the column name; task_assignee→task→user),
+// which needs cross-entity JOIN aggregation — Track A4 in the Query Layer plan,
+// deliberately deferred. raw_sql wraps the rows in json_agg(...)::text so a
+// single scalar comes back, then json_parse.
+dome StatsService {
+    function runAgg(sql: string, projectId: int) {
+        let raw = raw_sql(sql, json_stringify([projectId]));
+        if (raw == null) {
+            return [];
+        }
+        return json_parse(raw);
+    }
+
+    // Native grouped aggregation — no raw_sql.
+    function byStatus(projectId: int) {
+        return select Task { status, total: count(*) } from AppDb.Task
+            where Task.projectId == @projectId
+            group by status
+            orderby status asc;
+    }
+
+    function byColumn(projectId: int) {
+        return StatsService.runAgg(
+            "SELECT coalesce(json_agg(s), '[]')::text FROM (SELECT t.\"columnId\" AS \"columnId\", c.name AS \"columnName\", count(*)::int AS total FROM task t JOIN \"column\" c ON c.id = t.\"columnId\" WHERE t.\"projectId\" = $1 GROUP BY t.\"columnId\", c.name ORDER BY t.\"columnId\") s",
+            projectId
+        );
+    }
+
+    function byAssignee(projectId: int) {
+        return StatsService.runAgg(
+            "SELECT coalesce(json_agg(s), '[]')::text FROM (SELECT ta.\"userId\" AS \"userId\", u.name AS \"userName\", count(*)::int AS total FROM task_assignee ta JOIN task t ON t.id = ta.\"taskId\" JOIN \"user\" u ON u.id = ta.\"userId\" WHERE t.\"projectId\" = $1 GROUP BY ta.\"userId\", u.name ORDER BY count(*) DESC) s",
+            projectId
+        );
+    }
+}

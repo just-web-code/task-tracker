@@ -1,0 +1,126 @@
+// 0.4.9: a body key named `status` round-trips intact (the HTTP status now
+// travels through an internal sentinel), so Task responses are returned bare —
+// no more `{ data: ... }` envelope.
+
+route POST "/columns/{cid}/tasks" use Auth {
+    validate body {
+        title: required, minLength(1), maxLength(300);
+    }
+    let userId = context("userId");
+    let cid = int(path_param("cid"));
+    let col = ColumnService.getById(cid);
+    if (col == null) {
+        return notFound();
+    }
+    let board = BoardService.getById(col.boardId);
+    if (board == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(board.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    let t = TaskService.create(cid, board.projectId, userId, body());
+    ActivityService.record(board.projectId, userId, "task.created", { taskId: t.id, title: t.title });
+    return created(json(t));
+}
+
+route GET "/projects/{pid}/tasks" use Auth {
+    let userId = context("userId");
+    let pid = int(path_param("pid"));
+    let proj = ProjectService.getById(pid);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    // 0.4.9: query_param returns "" (not null) when absent — no coercion needed;
+    // "" already means "no filter" downstream.
+    let status = query_param("status");
+    let priority = query_param("priority");
+    let page = 1;
+    let pageStr = query_param("page");
+    if (pageStr != "") {
+        page = int(pageStr);
+    }
+    let pageSize = 20;
+    let psStr = query_param("pageSize");
+    if (psStr != "") {
+        pageSize = int(psStr);
+    }
+    return json(TaskService.listByProject(pid, status, priority, page, pageSize));
+}
+
+route GET "/tasks/{id}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    return json(TaskService.getWithRelations(id));
+}
+
+route PATCH "/tasks/{id}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    let updated = TaskService.update(id, body());
+    return json(updated);
+}
+
+route POST "/tasks/{id}/move" use Auth {
+    validate body {
+        columnId: required;
+        position: required;
+    }
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    let req = body();
+    let targetCol = ColumnService.getById(req.columnId);
+    if (targetCol == null) {
+        return badRequest({ error: "target column not found" });
+    }
+    let targetBoard = BoardService.getById(targetCol.boardId);
+    if (targetBoard == null) {
+        return badRequest({ error: "target column invalid" });
+    }
+    if (targetBoard.projectId != t.projectId) {
+        return badRequest({ error: "cannot move task across projects" });
+    }
+    let updated = TaskService.move(id, req.columnId, req.position);
+    ActivityService.record(t.projectId, userId, "task.moved", { taskId: id, toColumn: req.columnId });
+    return json(updated);
+}

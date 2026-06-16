@@ -1,0 +1,16 @@
+route GET "/projects/{pid}/stats" use Auth {
+    let userId = context("userId");
+    let pid = int(path_param("pid"));
+    let proj = ProjectService.getById(pid);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    return json({
+        byStatus:   StatsService.byStatus(pid),
+        byColumn:   StatsService.byColumn(pid),
+        byAssignee: StatsService.byAssignee(pid)
+    });
+}

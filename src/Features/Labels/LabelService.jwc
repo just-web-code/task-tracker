@@ -1,0 +1,20 @@
+dome LabelService {
+    function create(workspaceId: int, name: string, color: string) {
+        let l = new Label();
+        l.workspaceId = workspaceId;
+        l.name = name;
+        l.color = color;
+        insert l into AppDb.Label;
+        return l;
+    }
+
+    function listByWorkspace(workspaceId: int) {
+        return select Label from AppDb.Label
+            where Label.workspaceId == @workspaceId
+            orderby Label.name asc;
+    }
+
+    function getById(id: int) {
+        return select Label from AppDb.Label where Label.id == @id first;
+    }
+}

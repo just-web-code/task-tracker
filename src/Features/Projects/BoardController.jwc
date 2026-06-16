@@ -1,0 +1,17 @@
+route POST "/projects/{pid}/boards" use Auth {
+    validate body {
+        name: required, minLength(1), maxLength(150);
+    }
+    let userId = context("userId");
+    let pid = int(path_param("pid"));
+    let p = ProjectService.getById(pid);
+    if (p == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(p.workspaceId, userId)) {
+        return forbidden();
+    }
+    let req = body();
+    let b = BoardService.create(pid, req.name);
+    return created(json(b));
+}

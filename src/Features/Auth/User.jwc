@@ -1,0 +1,18 @@
+entity User of AppDb {
+    id           int pk autoincrement;
+    email        varchar(120) unique;
+    passwordHash varchar(255);
+    name         varchar(120);
+    createdAt    datetime;
+}
+
+class RegisterRequest {
+    email    string;
+    password string;
+    name     string;
+}
+
+class LoginRequest {
+    email    string;
+    password string;
+}

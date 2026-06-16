@@ -1,0 +1,16 @@
+// Verifies `Authorization: Bearer <jwt>` and stashes the user id as
+// context("userId") for gated routes.
+middleware Auth {
+    let raw = header("authorization");
+    if (raw == null) {
+        return unauthorized();
+    }
+    // 0.4.9: jwt_verify strips an optional "Bearer " prefix itself — pass the
+    // raw header straight through.
+    try {
+        let claims = jwt_verify(raw, env("JWT_SECRET"));
+        setContext("userId", claims.sub);
+    } catch (e) {
+        return unauthorized();
+    }
+}

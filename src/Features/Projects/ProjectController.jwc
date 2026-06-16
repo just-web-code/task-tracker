@@ -1,0 +1,77 @@
+route GET "/workspaces/{wid}/projects" use Auth {
+    let userId = context("userId");
+    let wid = int(path_param("wid"));
+    if (!WorkspaceService.isMember(wid, userId)) {
+        return forbidden();
+    }
+    let limit = 20;
+    let limitStr = query_param("limit");
+    if (limitStr != "") {
+        limit = int(limitStr);
+    }
+    let offset = 0;
+    let offsetStr = query_param("offset");
+    if (offsetStr != "") {
+        offset = int(offsetStr);
+    }
+    return json(ProjectService.listByWorkspace(wid, limit, offset));
+}
+
+route POST "/workspaces/{wid}/projects" use Auth {
+    validate body {
+        name: required, minLength(1), maxLength(150);
+    }
+    let userId = context("userId");
+    let wid = int(path_param("wid"));
+    if (!WorkspaceService.isMember(wid, userId)) {
+        return forbidden();
+    }
+    let req = body();
+    let desc = req.description;
+    if (desc == null) {
+        desc = "";
+    }
+    let p = ProjectService.create(wid, req.name, desc);
+    return created(json(p));
+}
+
+route GET "/projects/{id}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let p = ProjectService.getById(id);
+    if (p == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(p.workspaceId, userId)) {
+        return forbidden();
+    }
+    return json(ProjectService.detail(p));
+}
+
+route PATCH "/projects/{id}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let p = ProjectService.getById(id);
+    if (p == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(p.workspaceId, userId)) {
+        return forbidden();
+    }
+    let updated = ProjectService.update(id, body());
+    return json(updated);
+}
+
+route DELETE "/projects/{id}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let p = ProjectService.getById(id);
+    if (p == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(p.workspaceId, userId)) {
+        return forbidden();
+    }
+    ProjectService.deleteDeep(id);
+    return noContent();
+}

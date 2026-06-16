@@ -1,0 +1,18 @@
+entity Project of AppDb {
+    id          int pk autoincrement;
+    workspaceId int;
+    name        varchar(150);
+    description varchar(2000);
+    createdAt   datetime;
+    boards: List<Board> via Board.projectId;
+}
+
+class CreateProjectRequest {
+    name        string;
+    description string;
+}
+
+class UpdateProjectRequest {
+    name        string;
+    description string;
+}

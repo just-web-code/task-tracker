@@ -1,0 +1,11 @@
+entity Label of AppDb {
+    id          int pk autoincrement;
+    workspaceId int;
+    name        varchar(80);
+    color       varchar(20);
+}
+
+class CreateLabelRequest {
+    name  string;
+    color string;
+}

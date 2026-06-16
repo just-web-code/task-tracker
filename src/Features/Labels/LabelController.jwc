@@ -1,0 +1,26 @@
+route GET "/workspaces/{wid}/labels" use Auth {
+    let userId = context("userId");
+    let wid = int(path_param("wid"));
+    if (!WorkspaceService.isMember(wid, userId)) {
+        return forbidden();
+    }
+    return json(LabelService.listByWorkspace(wid));
+}
+
+route POST "/workspaces/{wid}/labels" use Auth {
+    validate body {
+        name: required, minLength(1), maxLength(80);
+    }
+    let userId = context("userId");
+    let wid = int(path_param("wid"));
+    if (!WorkspaceService.isMember(wid, userId)) {
+        return forbidden();
+    }
+    let req = body();
+    let color = "#888888";
+    if (req.color != null) {
+        color = req.color;
+    }
+    let label = LabelService.create(wid, req.name, color);
+    return created(json(label));
+}

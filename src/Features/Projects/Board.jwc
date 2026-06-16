@@ -1,0 +1,11 @@
+entity Board of AppDb {
+    id        int pk autoincrement;
+    projectId int;
+    name      varchar(150);
+    position  int;
+    columns: List<Column> via Column.boardId;
+}
+
+class CreateBoardRequest {
+    name string;
+}

@@ -1,0 +1,43 @@
+route POST "/boards/{bid}/columns" use Auth {
+    validate body {
+        name: required, minLength(1), maxLength(150);
+    }
+    let userId = context("userId");
+    let bid = int(path_param("bid"));
+    let b = BoardService.getById(bid);
+    if (b == null) {
+        return notFound();
+    }
+    let p = ProjectService.getById(b.projectId);
+    if (p == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(p.workspaceId, userId)) {
+        return forbidden();
+    }
+    let req = body();
+    let c = ColumnService.create(bid, req.name);
+    return created(json(c));
+}
+
+route PATCH "/columns/{id}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let c = ColumnService.getById(id);
+    if (c == null) {
+        return notFound();
+    }
+    let b = BoardService.getById(c.boardId);
+    if (b == null) {
+        return notFound();
+    }
+    let p = ProjectService.getById(b.projectId);
+    if (p == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(p.workspaceId, userId)) {
+        return forbidden();
+    }
+    let updated = ColumnService.update(c.id, body());
+    return json(updated);
+}

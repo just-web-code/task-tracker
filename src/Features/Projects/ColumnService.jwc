@@ -1,0 +1,34 @@
+dome ColumnService {
+    function create(boardId: int, name: string) {
+        let n = select count(*) from AppDb.Column where Column.boardId == @boardId;
+        let pos = n + 1;
+        let c = new Column();
+        c.boardId = boardId;
+        c.name = name;
+        c.position = pos;
+        insert c into AppDb.Column;
+        return c;
+    }
+
+    function getById(id: int): Column? {
+        return select Column from AppDb.Column where Column.id == @id first;
+    }
+
+    // 0.4.9: `update <var> in` takes the select-loaded row directly — load, set
+    // the sent fields, update, return. (req stays untyped: a typed param with an
+    // `int` field can't distinguish "absent" from 0 on a partial PATCH.)
+    function update(id: int, req) {
+        let c = select Column from AppDb.Column where Column.id == @id first;
+        if (c == null) {
+            return null;
+        }
+        if (req.name != null) {
+            c.name = req.name;
+        }
+        if (req.position != null) {
+            c.position = req.position;
+        }
+        update c in AppDb.Column;
+        return c;
+    }
+}

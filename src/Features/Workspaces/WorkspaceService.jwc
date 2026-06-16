@@ -1,0 +1,55 @@
+dome WorkspaceService {
+    function createWithOwner(ownerId: int, name: string): Workspace {
+        let ws = new Workspace();
+        ws.name = name;
+        ws.ownerId = ownerId;
+        ws.createdAt = now();
+        transaction {
+            insert ws into AppDb.Workspace;
+
+            let member = new WorkspaceMember();
+            member.workspaceId = ws.id;
+            member.userId = ownerId;
+            member.role = "owner";
+            insert member into AppDb.WorkspaceMember;
+        }
+        return ws;
+    }
+
+    // Query Layer: `with workspace` (belongs-to) eager-loads each membership's
+    // workspace in one query — no per-membership N+1.
+    function myWorkspaces(userId: int) {
+        let memberships = select WorkspaceMember with workspace from AppDb.WorkspaceMember
+            where WorkspaceMember.userId == @userId;
+        let result = [];
+        for m in memberships {
+            if (m.workspace != null) {
+                push(result, m.workspace);
+            }
+        }
+        return result;
+    }
+
+    function getById(id: int): Workspace? {
+        return select Workspace from AppDb.Workspace where Workspace.id == @id first;
+    }
+
+    function members(workspaceId: int) {
+        return select WorkspaceMember from AppDb.WorkspaceMember where WorkspaceMember.workspaceId == @workspaceId;
+    }
+
+    function isMember(workspaceId: int, userId: int): bool {
+        let m = select WorkspaceMember from AppDb.WorkspaceMember
+            where WorkspaceMember.workspaceId == @workspaceId and WorkspaceMember.userId == @userId first;
+        return m != null;
+    }
+
+    function addMember(workspaceId: int, userId: int, role: string): WorkspaceMember {
+        let member = new WorkspaceMember();
+        member.workspaceId = workspaceId;
+        member.userId = userId;
+        member.role = role;
+        insert member into AppDb.WorkspaceMember;
+        return member;
+    }
+}

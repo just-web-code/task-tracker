@@ -1,0 +1,94 @@
+// m2m: attach/detach labels and assignees on a task. All routes scope through
+// task -> projectId -> project -> workspace membership.
+
+route POST "/tasks/{id}/labels" use Auth {
+    validate body {
+        labelId: required;
+    }
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    let req = body();
+    let label = LabelService.getById(req.labelId);
+    if (label == null) {
+        return badRequest({ error: "label not found" });
+    }
+    if (label.workspaceId != proj.workspaceId) {
+        return badRequest({ error: "label belongs to another workspace" });
+    }
+    TaskService.addLabel(id, req.labelId);
+    return json(TaskService.getWithRelations(id));
+}
+
+route DELETE "/tasks/{id}/labels/{labelId}" use Auth {
+    let userId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, userId)) {
+        return forbidden();
+    }
+    let labelId = int(path_param("labelId"));
+    TaskService.removeLabel(id, labelId);
+    return noContent();
+}
+
+route POST "/tasks/{id}/assignees" use Auth {
+    validate body {
+        userId: required;
+    }
+    let actorId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, actorId)) {
+        return forbidden();
+    }
+    let req = body();
+    if (!WorkspaceService.isMember(proj.workspaceId, req.userId)) {
+        return badRequest({ error: "assignee is not a member of this workspace" });
+    }
+    TaskService.addAssignee(id, req.userId);
+    return json(TaskService.getWithRelations(id));
+}
+
+route DELETE "/tasks/{id}/assignees/{userId}" use Auth {
+    let actorId = context("userId");
+    let id = int(path_param("id"));
+    let t = TaskService.getById(id);
+    if (t == null) {
+        return notFound();
+    }
+    let proj = ProjectService.getById(t.projectId);
+    if (proj == null) {
+        return notFound();
+    }
+    if (!WorkspaceService.isMember(proj.workspaceId, actorId)) {
+        return forbidden();
+    }
+    let targetUserId = int(path_param("userId"));
+    TaskService.removeAssignee(id, targetUserId);
+    return noContent();
+}

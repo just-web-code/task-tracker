@@ -1,0 +1,11 @@
+entity Activity of AppDb {
+    id        int pk autoincrement;
+    projectId int;
+    actorId   int;
+    type      varchar(50);
+    // 0.4.9: schema-aware binding stores an object straight into a `json`
+    // (jsonb) column — no more text round-trip via json_stringify/json_parse.
+    payload   json;
+    createdAt datetime;
+    actor: User { id, name } via actorId;
+}
