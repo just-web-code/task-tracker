@@ -54,14 +54,17 @@ dome ProjectService {
     }
 
     // Manual cascade: no FK on-delete-cascade declared, so wipe the subtree
-    // in one transaction (pain log #5 — multi-step atomic write).
+    // in one transaction (pain log #5 — multi-step atomic write). Columns are
+    // deleted in a single `in (@boardIds)` (= ANY) statement instead of one
+    // delete per board — the write-path N+1 that needed dynamic in-list (2b).
     function deleteDeep(projectId: int) {
         transaction {
-            let boards = select Board from AppDb.Board where Board.projectId == @projectId;
+            let boards = select Board { id } from AppDb.Board where Board.projectId == @projectId;
+            let boardIds = [];
             for b in boards {
-                let bid = b.id;
-                delete from AppDb.Column where Column.boardId == @bid;
+                push(boardIds, b.id);
             }
+            delete from AppDb.Column where Column.boardId in (@boardIds);
             delete from AppDb.Board where Board.projectId == @projectId;
             delete from AppDb.Project where Project.id == @projectId;
         }
