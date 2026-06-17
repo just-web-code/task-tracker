@@ -61,10 +61,11 @@ Faqat rost.
 
 ## Hali rough / qolgan (halol)
 
-1. **🟡 task-tracker FULL native emas — auth builtinlar.** `jwc build --native`
-   query-layer'ni qabul qiladi, lekin `jwt_verify`/`jwt_sign`/`verify_password`/
-   `hash_password`/`env` native'da yo'q (crypto deps + prelude kerak). Bu
-   query-layer EMAS — alohida builtin-coverage scope.
+1. **🟡 task-tracker FULL native emas — JWT builtinlari.** `jwc build --native`
+   query-layer'ni va `hash_password`/`verify_password`/`env`'ni qabul qiladi,
+   lekin `jwt_sign`/`jwt_verify` native'da yo'q (crypto deps + prelude kerak) →
+   Bearer-auth yo'li native build bo'lmaydi. Bu query-layer EMAS — alohida
+   builtin-coverage scope.
 2. **🟢 Dinamik in-list `= ANY` native'da yo'q.** Interpreter ishlatadi
    (deleteDeep) — native'da interpreter-only (runtime array-param coverage
    Linux/CI'da). app interpreter'da ishlaganda muammo emas.
