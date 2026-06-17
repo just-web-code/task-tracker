@@ -63,3 +63,46 @@ Query-Layer endpointlari curl bilan. Hammasi to'g'ri natija qaytardi. Faqat rost
 > agg (A4 JOIN) va dinamik filter (C1) — keyingi epiclar. Til "web backend yoz,
 > CRUD'ni qo'lda yozmasdan, ORM bilan kurashmasdan" va'dasiga sezilarli
 > yaqinlashdi.
+
+---
+
+## Addendum — Swagger / OpenAPI "ko'z bo'yamachilik" tekshiruvi (jwc-shortener)
+
+**Manba:** [jwc-shortener](https://github.com/Nodirbek-Abdulaxadov/jwc-shortener)
+(`main.jwc` + `views.jwc`). Savol: o'sha loyihada "Swagger qo'shildi" deyilgan —
+bu til imkoniyatimi yoki ko'z bo'yamachilikmi? Tekshirildi — **qisman ko'z
+bo'yamachilik.** UI rost, lekin OpenAPI hujjat qo'lda boqiladigan, koddan uzilgan
+statik string; JWC hech narsa generatsiya qilmaydi.
+
+**Halol qism:**
+- **Swagger UI o'zi rost.** `route GET "docs"` → `html(landing_docs())`; `html(...)`
+  haqiqiy builtin (0.3.6+, `text/html`). Sahifa unpkg'dan `swagger-ui-dist@5`ни
+  yuklab `/openapi.json`ga qaraydi. Bu joyда hiyla yo'q.
+
+**Ko'z bo'yamachilik / til bo'shlig'i:**
+1. **🔴 `/openapi.json` — 100% qo'lда yozilgan statik string** (`openapi_spec()`,
+   `views.jwc:369`). JWC route/entity/`validate` bloklarini introspeksiya
+   qilmaydi — spec'ни tug'dirmaydi. Ya'ni "JWC'да OpenAPI bor" emas; bu shunchaki
+   ikkита route doim bitta o'zgarmas matn qaytaradi. "Framework API doc beradi"
+   degan taassurot bor, imkoniyat yo'q.
+2. **🔴 Sabab — til cheklovi (kommentда tan olingan, `views.jwc:370`).** JWC obyekt
+   literali faqat **bare-identifier kalit** qabul qiladi (`"/healthz"`, `"200"`,
+   `"application/json"` kabi kalitlar mumkin emas) va **array literal yo'q**
+   (`servers`, `required`, `parameters` massivlarini yoza olmaysan). Shu sabab
+   OpenAPI hujjatni normal JWC qiymati sifatida qurib `json()` bilan berib
+   bo'lmaydi — escaped JSON'ни string ichида qo'lда terishга majbursan.
+3. **🔴 Drift isboti (ko'z bo'yamachilikning aniq joyi).** Qo'lда spec **8 path**
+   hujjatlaydi, kodда esa **9 real route** bor — **`/readyz` specда umuman yo'q**.
+   Hech kim sinxronlamaydi, shuning uchun spec allaqachon kod bilan rost emas.
+   (JSON o'zi valid — 8 path parse bo'ladi — lekin to'liq emas. "Ishlayapti"
+   ko'rinadi, aslida yarmi qo'lда eskirgan.)
+
+> **Xulosa:** Swagger UI ekranда chiroyli ko'rinadi, JSON valid — lekin ortida
+> "API hujjati til imkoniyati" yo'q. Bu **qo'lда boqiladigan, koddan uzilgan,
+> allaqachon driftga ketgan** artefakt. Halol nomi: "Swagger UI'ni statik spec
+> bilan ko'rsatdik", "JWC OpenAPI generatsiya qiladi" emas.
+>
+> **Keyingi feature (oltin ro'yxatga):** (a) route + `validate` introspeksiyadan
+> `/openapi.json`ни **avtomatik** tug'dirish; yoki hech bo'lmaganda (b) obyekt
+> literalда **string kalit + array literal** — shunда specни oddiy JWC qiymati
+> sifatida qurib serialize qilса bo'lardi, qo'lда escaped string kerak bo'lmasdi.
