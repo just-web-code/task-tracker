@@ -1,0 +1,62 @@
+namespace services.boards;
+
+import app;
+import db.schema;
+import dto.requests;
+
+service BoardService {
+    --- The new board goes at the end. `count(*) + 1` reads and writes in
+    --- two statements, so two concurrent creates can pick the same
+    --- position; the 0.9.x version had the same race and the same reason
+    --- not to care — a board list re-orders on the client anyway, and a
+    --- unique constraint here would reject a legitimate create.
+    function create(project_id: int, req: CreateBoardRequest) {
+        let n = select B from App.public.Boards
+            where project_id == $project_id
+            as { total: count(id) }
+            first;
+
+        return insert into App.public.Boards {
+            project_id = $project_id,
+            name       = $req.name,
+            position   = $n.total + 1
+        } as { id, project_id, name, position };
+    }
+
+    function by_id(id: int) {
+        return select B from App.public.Boards
+            where id == $id
+            as { id, project_id, name, position }
+            first;
+    }
+}
+
+service ColumnService {
+    function create(board_id: int, req: CreateColumnRequest) {
+        let n = select C from App.public.Columns
+            where board_id == $board_id
+            as { total: count(id) }
+            first;
+
+        return insert into App.public.Columns {
+            board_id = $board_id,
+            name     = $req.name,
+            position = $n.total + 1
+        } as { id, board_id, name, position };
+    }
+
+    function by_id(id: int) {
+        return select C from App.public.Columns
+            where id == $id
+            as { id, board_id, name, position }
+            first;
+    }
+
+    function update(id: int, req: UpdateColumnRequest) {
+        return update App.public.Columns
+            set name =? $req.name, position =? $req.position
+            where id == $id
+            as { id, board_id, name, position }
+            first or throw NotFound("ustun topilmadi");
+    }
+}

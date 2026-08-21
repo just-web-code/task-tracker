@@ -1,6 +1,0 @@
-// One global handler for any uncaught throw in a route — turns a raw 500 into
-// a consistent JSON envelope. Validation / notFound / forbidden are returned
-// explicitly in handlers and never reach here.
-errorHandler (e) {
-    return internalError({ error: e.message, code: e.type });
-}

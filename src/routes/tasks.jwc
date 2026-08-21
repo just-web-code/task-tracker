@@ -1,0 +1,154 @@
+namespace routes.tasks;
+
+import app;
+import dto.requests;
+import middleware.auth;
+import services.boards;
+import services.collab;
+import services.projects;
+import services.tasks;
+import services.workspaces;
+
+--- Every route here scopes through task → project → workspace membership.
+--- The chain is three lookups; they are the same three the 0.9.x version
+--- made, and they are what keeps a task id from being an authorisation
+--- bypass.
+routes "/tasks" use RequireAuth {
+    route GET "{id: int}" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        return json(TaskService.detail(@id));
+    }
+
+    route PATCH "{id: int}" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        let req = request.body() as UpdateTaskRequest;
+
+        return json(TaskService.update(@id, $req));
+    }
+
+    route POST "{id: int}/move" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        let req = request.body() as MoveTaskRequest;
+
+        --- A move may not cross projects: positions are numbered per column
+        --- and `project_id` is denormalised onto the task, so a cross-project
+        --- move would leave both wrong.
+        let target = ColumnService.by_id($req.column_id)
+            or throw BadRequest("maqsad ustun topilmadi");
+        let board = BoardService.by_id($target.board_id)
+            or throw BadRequest("maqsad ustun yaroqsiz");
+        if ($board.project_id != $t.project_id) {
+            throw BadRequest("vazifani boshqa loyihaga ko'chirib bo'lmaydi");
+        }
+
+        let moved = TaskService.move(@id, $t.column_id, $t.position, $req);
+
+        ActivityService.record(
+            $t.project_id,
+            context.user_id,
+            "task.moved",
+            { task_id: @id, to_column: $req.column_id }
+        );
+
+        return json($moved);
+    }
+
+    route GET "{id: int}/comments" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        return json(CommentService.list_by_task(
+            @id,
+            request.query("cursor"),
+            int(request.query("size") ?? "20")
+        ));
+    }
+
+    route POST "{id: int}/comments" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        let req = request.body() as CreateCommentRequest;
+        let comment = CommentService.create(@id, context.user_id, $req);
+
+        ActivityService.record(
+            $t.project_id,
+            context.user_id,
+            "comment.added",
+            { task_id: @id, comment_id: $comment.id }
+        );
+
+        return created(json($comment));
+    }
+
+    route POST "{id: int}/labels" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        let req = request.body() as AttachLabelRequest;
+
+        --- A label belongs to a workspace, and a task can only carry labels
+        --- from its own — otherwise a member of one workspace could tag a
+        --- task with a label whose name they chose in another.
+        let label = LabelService.by_id($req.label_id)
+            or throw BadRequest("yorliq topilmadi");
+        if ($label.workspace_id != $p.workspace_id) {
+            throw BadRequest("yorliq boshqa ish maydoniga tegishli");
+        }
+
+        TaskService.add_label(@id, $req.label_id);
+
+        return json(TaskService.detail(@id));
+    }
+
+    route DELETE "{id: int}/labels/{label_id: int}" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        TaskService.remove_label(@id, @label_id);
+
+        return noContent();
+    }
+
+    route POST "{id: int}/assignees" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        let req = request.body() as AssignRequest;
+
+        --- The assignee has to be a member too: assigning an outsider would
+        --- put a task on a board they cannot open.
+        WorkspaceService.require_member($p.workspace_id, $req.user_id)
+            catch NotAMember (e) {
+                throw BadRequest("bu foydalanuvchi ish maydoni a'zosi emas");
+            };
+
+        TaskService.add_assignee(@id, $req.user_id);
+
+        return json(TaskService.detail(@id));
+    }
+
+    route DELETE "{id: int}/assignees/{user_id: int}" {
+        let t = TaskService.by_id(@id) or throw NotFound("vazifa topilmadi");
+        let p = ProjectService.by_id($t.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member($p.workspace_id, context.user_id);
+
+        TaskService.remove_assignee(@id, @user_id);
+
+        return noContent();
+    }
+}

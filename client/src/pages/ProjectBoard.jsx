@@ -27,8 +27,8 @@ export default function ProjectBoard() {
       setProject(p)
       const [t, l, w] = await Promise.all([
         api.listTasks(pid, { pageSize: 200 }),
-        api.listLabels(p.workspaceId),
-        api.getWorkspace(p.workspaceId),
+        api.listLabels(p.workspace_id),
+        api.getWorkspace(p.workspace_id),
       ])
       setTasks(t.items || [])
       setLabels(l)
@@ -71,8 +71,8 @@ export default function ProjectBoard() {
     if (dragId == null) return
     const task = tasks.find((t) => t.id === dragId)
     setDragId(null)
-    if (!task || task.columnId === columnId) return
-    const position = tasks.filter((t) => t.columnId === columnId).length + 1
+    if (!task || task.column_id === columnId) return
+    const position = tasks.filter((t) => t.column_id === columnId).length + 1
     try { await api.moveTask(task.id, columnId, position); load() }
     catch (e) { setErr(e.message) }
   }
@@ -80,13 +80,13 @@ export default function ProjectBoard() {
   if (!project) return <div className="page">{err ? <div className="error">{err}</div> : <p className="muted">Loading…</p>}</div>
 
   const tasksByColumn = (cid) =>
-    tasks.filter((t) => t.columnId === cid).sort((a, b) => a.position - b.position)
+    tasks.filter((t) => t.column_id === cid).sort((a, b) => a.position - b.position)
 
   return (
     <div className="page board-page">
       <div className="breadcrumb">
         <Link to="/">Workspaces</Link> <span>/</span>
-        <Link to={`/workspaces/${project.workspaceId}`}>workspace #{project.workspaceId}</Link> <span>/</span>
+        <Link to={`/workspaces/${project.workspace_id}`}>workspace #{project.workspace_id}</Link> <span>/</span>
         <strong>{project.name}</strong>
         <Link className="btn ghost" style={{ marginLeft: 'auto' }} to={`/projects/${pid}/stats`}>📊 Stats</Link>
       </div>

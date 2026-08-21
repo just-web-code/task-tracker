@@ -1,0 +1,94 @@
+namespace dto.requests;
+
+--- A `class` is a whitelist: unknown keys are dropped, and the rules here
+--- are the whole of the 400 contract (types.md §11). The 0.9.x version
+--- spelled these as `validate body { … }` inside each route; in 1.0 the
+--- rules live with the shape and the route says `request.body() as C`.
+
+class RegisterRequest {
+    email    varchar(120) required, pattern(r"^[^@]+@[^@]+\.[^@]+$");
+    password varchar(200) required, minLength(8), maxLength(200);
+    name     varchar(120) required, minLength(1), maxLength(120);
+}
+
+class LoginRequest {
+    email    varchar(120) required;
+    password varchar(200) required;
+}
+
+class CreateWorkspaceRequest {
+    name varchar(150) required, minLength(1), maxLength(150);
+}
+
+class AddMemberRequest {
+    user_id int required;
+    role    varchar(20) required;
+}
+
+class CreateProjectRequest {
+    name        varchar(150) required, minLength(1), maxLength(150);
+    description varchar(2000)?;
+}
+
+--- No `required` anywhere: a PATCH sends the fields it is changing, and
+--- types.md §6.5 keeps absent distinguishable from null, so `=?` can skip
+--- the assignment for the ones that were not sent.
+class UpdateProjectRequest {
+    name        varchar(150) minLength(1), maxLength(150);
+    description varchar(2000);
+}
+
+class CreateBoardRequest {
+    name varchar(150) required, minLength(1), maxLength(150);
+}
+
+class CreateColumnRequest {
+    name varchar(150) required, minLength(1), maxLength(150);
+}
+
+class UpdateColumnRequest {
+    name     varchar(150) minLength(1), maxLength(150);
+    position int;
+}
+
+--- The three optional fields are `?` so a body that omits them reaches
+--- the service as null and the service supplies the default. Without the
+--- `?` the class type says they are always present, `??` is dead code
+--- (W0301), and the insert binds null into a NOT NULL column.
+class CreateTaskRequest {
+    title       varchar(300) required, minLength(1), maxLength(300);
+    description varchar(4000)?;
+    status      varchar(30)?;
+    priority    varchar(20)?;
+    due_date    timestamptz?;
+}
+
+class UpdateTaskRequest {
+    title       varchar(300) minLength(1), maxLength(300);
+    description varchar(4000);
+    status      varchar(30);
+    priority    varchar(20);
+    due_date    timestamptz;
+}
+
+class MoveTaskRequest {
+    column_id int required;
+    position  int required;
+}
+
+class CreateLabelRequest {
+    name  varchar(80) required, minLength(1), maxLength(80);
+    color varchar(20)?;
+}
+
+class AttachLabelRequest {
+    label_id int required;
+}
+
+class AssignRequest {
+    user_id int required;
+}
+
+class CreateCommentRequest {
+    body varchar(4000) required, minLength(1), maxLength(4000);
+}

@@ -69,7 +69,7 @@ export default function TaskModal({ taskId, labels, members, onClose, onChanged 
   const attachedLabelIds = new Set((task?.labels || []).map((l) => l.id))
   const availableLabels = labels.filter((l) => !attachedLabelIds.has(l.id))
   const assignedIds = new Set((task?.assignees || []).map((u) => u.id))
-  const availableMembers = members.filter((m) => !assignedIds.has(m.userId))
+  const availableMembers = members.filter((m) => !assignedIds.has(m.user_id))
 
   return (
     <Modal title={task ? `Task #${task.id}` : 'Task'} onClose={onClose} wide>
@@ -94,8 +94,8 @@ export default function TaskModal({ taskId, labels, members, onClose, onChanged 
                 {comments.map((c) => (
                   <div key={c.id} className="comment">
                     <div className="comment-head">
-                      <strong>{c.author ? c.author.name : `user #${c.authorId}`}</strong>
-                      <span className="muted">{fmt(c.createdAt)}</span>
+                      <strong>{c.author ? c.author.name : `user #${c.author_id}`}</strong>
+                      <span className="muted">{fmt(c.created_at)}</span>
                     </div>
                     <div>{c.body}</div>
                   </div>
@@ -162,7 +162,7 @@ export default function TaskModal({ taskId, labels, members, onClose, onChanged 
                   <select value={addUserId} onChange={(e) => setAddUserId(e.target.value)}>
                     <option value="">Assign member…</option>
                     {availableMembers.map((m) => (
-                      <option key={m.userId} value={m.userId}>user #{m.userId} ({m.role})</option>
+                      <option key={m.user_id} value={m.user_id}>user #{m.user_id} ({m.role})</option>
                     ))}
                   </select>
                   <button className="btn" onClick={attachAssignee}>Add</button>

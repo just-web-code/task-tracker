@@ -1,4 +1,10 @@
-// Thin fetch wrapper around the JWC Task Tracker API. Every call goes to
+// Thin fetch wrapper around the JWC Task Tracker API.
+//
+// The backend was ported to the JWC 1.0 vocabulary, which spells columns in
+// snake_case (names.md §3.2), and a projection's keys are the declared
+// names — so every field that used to arrive as `workspaceId` now arrives as
+// `workspace_id`. Request bodies changed with them. The two list endpoints
+// that used to take `limit`/`offset` now take a signed `cursor`. Every call goes to
 // `/api/*`, which the Vite dev server proxies to the backend (see vite.config.js).
 // The JWT is kept in localStorage and attached as `Authorization: Bearer <token>`.
 
@@ -65,7 +71,7 @@ export const api = {
   createWorkspace: (name) => request('POST', '/workspaces', { name }),
   getWorkspace: (id) => request('GET', `/workspaces/${id}`),
   addMember: (id, userId, role) =>
-    request('POST', `/workspaces/${id}/members`, { userId, role }),
+    request('POST', `/workspaces/${id}/members`, { user_id: userId, role }),
 
   // ---- labels ----
   listLabels: (wid) => request('GET', `/workspaces/${wid}/labels`),
@@ -73,7 +79,15 @@ export const api = {
     request('POST', `/workspaces/${wid}/labels`, { name, color }),
 
   // ---- projects ----
-  listProjects: (wid) => request('GET', `/workspaces/${wid}/projects`),
+  // Keyset paging: pass the previous page's `next` back as `cursor`.
+  // The old `limit`/`offset` pair is gone — an offset re-scans every row
+  // before the page and drifts when one is inserted mid-scroll.
+  listProjects: (wid, params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null)
+    ).toString()
+    return request('GET', `/workspaces/${wid}/projects${qs ? '?' + qs : ''}`)
+  },
   createProject: (wid, name, description) =>
     request('POST', `/workspaces/${wid}/projects`, { name, description }),
   getProject: (id) => request('GET', `/projects/${id}`),
@@ -96,14 +110,19 @@ export const api = {
   getTask: (id) => request('GET', `/tasks/${id}`),
   updateTask: (id, patch) => request('PATCH', `/tasks/${id}`, patch),
   moveTask: (id, columnId, position) =>
-    request('POST', `/tasks/${id}/move`, { columnId, position }),
-  addTaskLabel: (id, labelId) => request('POST', `/tasks/${id}/labels`, { labelId }),
+    request('POST', `/tasks/${id}/move`, { column_id: columnId, position }),
+  addTaskLabel: (id, labelId) => request('POST', `/tasks/${id}/labels`, { label_id: labelId }),
   removeTaskLabel: (id, labelId) => request('DELETE', `/tasks/${id}/labels/${labelId}`),
-  addAssignee: (id, userId) => request('POST', `/tasks/${id}/assignees`, { userId }),
+  addAssignee: (id, userId) => request('POST', `/tasks/${id}/assignees`, { user_id: userId }),
   removeAssignee: (id, userId) => request('DELETE', `/tasks/${id}/assignees/${userId}`),
 
   // ---- comments ----
-  listComments: (tid) => request('GET', `/tasks/${tid}/comments`),
+  listComments: (tid, params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== '' && v != null)
+    ).toString()
+    return request('GET', `/tasks/${tid}/comments${qs ? '?' + qs : ''}`)
+  },
   addComment: (tid, body) => request('POST', `/tasks/${tid}/comments`, { body }),
 
   // ---- stats / activity ----

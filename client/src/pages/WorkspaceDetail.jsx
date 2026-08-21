@@ -119,8 +119,8 @@ export default function WorkspaceDetail() {
             <h3>Members</h3>
             <ul className="plain">
               {(ws.members || []).map((m) => (
-                <li key={m.userId}>
-                  <span>user #{m.userId}</span>
+                <li key={m.user_id}>
+                  <span>user #{m.user_id}</span>
                   <span className={'pill ' + (m.role === 'owner' ? 'pill-owner' : '')}>{m.role}</span>
                 </li>
               ))}

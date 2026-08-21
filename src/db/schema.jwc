@@ -1,0 +1,171 @@
+namespace db.schema;
+
+import app;
+
+--- Every table and column below carries an `as "…"` override: the physical
+--- names are what the 0.9.x deployment created, and they are not what 1.0
+--- would spell them. See `app.jwc` for why they are kept.
+
+--- One human identity. Email is the login handle.
+table Users of App.public as "user" {
+    id            int primary key identity;
+    email         varchar(120) unique : "bu email allaqachon ro'yxatdan o'tgan";
+    --- Argon2id. `private` keeps it out of every projection, so a `select`
+    --- cannot leak it even by asking (schema.md §3.1).
+    password_hash varchar(255) as "passwordHash" private;
+    name          varchar(120);
+    created_at    timestamptz as "createdAt";
+
+    index on (created_at);
+}
+
+table Workspaces of App.public as "workspace" {
+    id         int primary key identity;
+    name       varchar(150);
+    owner_id   int as "ownerId";
+    created_at timestamptz as "createdAt";
+
+    foreign key (owner_id) references App.public.Users (id);
+}
+
+--- The authorisation table. Every read below a workspace goes through it.
+table WorkspaceMembers of App.public as "workspace_member" {
+    id           int primary key identity;
+    workspace_id int as "workspaceId";
+    user_id      int as "userId";
+    role         varchar(20);
+
+    foreign key (workspace_id) references App.public.Workspaces (id) on delete cascade;
+    foreign key (user_id) references App.public.Users (id) on delete cascade;
+
+    unique (workspace_id, user_id) : "bu foydalanuvchi allaqachon a'zo";
+    index on (user_id);
+}
+
+table Projects of App.public as "project" {
+    id           int primary key identity;
+    workspace_id int as "workspaceId";
+    name         varchar(150);
+    description  varchar(2000);
+    created_at   timestamptz as "createdAt";
+
+    foreign key (workspace_id) references App.public.Workspaces (id) on delete cascade;
+
+    index on (workspace_id, created_at);
+}
+
+table Boards of App.public as "board" {
+    id         int primary key identity;
+    project_id int as "projectId";
+    name       varchar(150);
+    position   int;
+
+    foreign key (project_id) references App.public.Projects (id) on delete cascade;
+
+    index on (project_id, position);
+}
+
+--- `Columns`, not `Column`: `column` is a reserved word in Postgres and the
+--- physical name is quoted anyway, but the plural also matches every other
+--- table here.
+table Columns of App.public as "column" {
+    id       int primary key identity;
+    board_id int as "boardId";
+    name     varchar(150);
+    position int;
+
+    foreign key (board_id) references App.public.Boards (id) on delete cascade;
+
+    index on (board_id, position);
+}
+
+table Tasks of App.public as "task" {
+    id             int primary key identity;
+    column_id      int as "columnId";
+    --- Denormalised. Every list query is per-project, and carrying the id
+    --- here avoids a column → board → project hop on each one. Stable: a
+    --- move only ever re-parents within a project, which `TaskService.move`
+    --- enforces.
+    project_id     int as "projectId";
+    title          varchar(300);
+    description    varchar(4000);
+    status         varchar(30);
+    priority       varchar(20);
+    position       int;
+    due_date       timestamptz? as "dueDate";
+    created_by_id  int as "createdById";
+    created_at     timestamptz as "createdAt";
+    updated_at     timestamptz as "updatedAt";
+
+    foreign key (column_id) references App.public.Columns (id) on delete cascade;
+    foreign key (project_id) references App.public.Projects (id) on delete cascade;
+    foreign key (created_by_id) references App.public.Users (id);
+
+    index on (project_id, position);
+    index on (column_id, position);
+}
+
+--- Join table: Task ↔ Label. The pair is unique, which is what makes
+--- `addLabel` idempotent without a read first.
+table TaskLabels of App.public as "task_label" {
+    id       int primary key identity;
+    task_id  int as "taskId";
+    label_id int as "labelId";
+
+    foreign key (task_id) references App.public.Tasks (id) on delete cascade;
+    foreign key (label_id) references App.public.Labels (id) on delete cascade;
+
+    unique (task_id, label_id) : "bu yorliq allaqachon biriktirilgan";
+}
+
+--- Join table: Task ↔ User.
+table TaskAssignees of App.public as "task_assignee" {
+    id      int primary key identity;
+    task_id int as "taskId";
+    user_id int as "userId";
+
+    foreign key (task_id) references App.public.Tasks (id) on delete cascade;
+    foreign key (user_id) references App.public.Users (id) on delete cascade;
+
+    unique (task_id, user_id) : "bu foydalanuvchi allaqachon biriktirilgan";
+}
+
+table Labels of App.public as "label" {
+    id           int primary key identity;
+    workspace_id int as "workspaceId";
+    name         varchar(80);
+    color        varchar(20);
+
+    foreign key (workspace_id) references App.public.Workspaces (id) on delete cascade;
+
+    index on (workspace_id, name);
+}
+
+table Comments of App.public as "comment" {
+    id         int primary key identity;
+    task_id    int as "taskId";
+    author_id  int as "authorId";
+    body       varchar(4000);
+    created_at timestamptz as "createdAt";
+
+    foreign key (task_id) references App.public.Tasks (id) on delete cascade;
+    foreign key (author_id) references App.public.Users (id) on delete cascade;
+
+    index on (task_id, created_at);
+}
+
+--- Append-only. `payload` is jsonb, so the shape is per-event and the
+--- reader does not have to know it.
+table Activities of App.public as "activity" {
+    id         int primary key identity;
+    project_id int as "projectId";
+    actor_id   int as "actorId";
+    type       varchar(50);
+    payload    jsonb;
+    created_at timestamptz as "createdAt";
+
+    foreign key (project_id) references App.public.Projects (id) on delete cascade;
+    foreign key (actor_id) references App.public.Users (id) on delete cascade;
+
+    index on (project_id, created_at);
+}

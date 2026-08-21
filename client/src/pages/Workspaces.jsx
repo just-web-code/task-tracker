@@ -11,7 +11,12 @@ export default function Workspaces() {
   async function load() {
     setErr(null)
     try {
-      setList(await api.listWorkspaces())
+      // `GET /workspaces` returns the caller's *memberships*, each carrying
+      // the workspace it grants and the role in it. The 0.9.x version
+      // unwrapped that in the service with a loop; 1.0 does it in the join,
+      // so the role is now available here and the shape is one level deeper.
+      const rows = await api.listWorkspaces()
+      setList(rows.map((r) => ({ ...r.workspace, role: r.role })))
     } catch (e) {
       setErr(e.message)
     }
@@ -57,7 +62,7 @@ export default function Workspaces() {
           {list.map((ws) => (
             <Link key={ws.id} to={`/workspaces/${ws.id}`} className="card tile">
               <h3>{ws.name}</h3>
-              <p className="muted">workspace #{ws.id} · owner #{ws.ownerId}</p>
+              <p className="muted">workspace #{ws.id} · owner #{ws.owner_id} · you are {ws.role}</p>
             </Link>
           ))}
         </div>

@@ -1,0 +1,18 @@
+namespace middleware.auth;
+
+--- `Authorization: Bearer <jwt>`, verified, with the subject handed to the
+--- handler as `context.user_id`. Middleware that declares what it provides
+--- is what makes a route that forgets the pair fail to compile
+--- (middleware.md §3.3).
+middleware RequireAuth provides user_id: int {
+    let header = request.header("Authorization") or throw Unauthorized("token kerak");
+
+    let secret = env("JWT_SECRET") or throw Unauthorized("server sozlanmagan");
+
+    --- `jwt.verify` strips an optional `Bearer ` prefix itself.
+    let claims = jwt.verify($header, $secret)
+        or throw Unauthorized("token yaroqsiz yoki muddati o'tgan");
+
+    --- Not client-derived: the signature proves we minted it (types.md §7.3).
+    context.user_id = int($claims.sub);
+}

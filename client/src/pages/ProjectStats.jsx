@@ -26,9 +26,9 @@ export default function ProjectStats() {
       {err && <div className="error">{err}</div>}
       {!stats ? <p className="muted">Loading…</p> : (
         <div className="cols-3">
-          <StatCard title="By status" rows={stats.byStatus} k="status" />
-          <StatCard title="By column" rows={stats.byColumn} k="columnName" />
-          <StatCard title="By assignee" rows={stats.byAssignee} k="userName" />
+          <StatCard title="By status" rows={stats.by_status} k="status" />
+          <StatCard title="By column" rows={stats.by_column} k="column_name" />
+          <StatCard title="By assignee" rows={stats.by_assignee} k="user_name" />
         </div>
       )}
 
@@ -42,7 +42,7 @@ export default function ProjectStats() {
                 <li key={a.id}>
                   <span className="pill">{a.type}</span>
                   <span>{a.actor ? a.actor.name : `user #${a.actorId}`}</span>
-                  <span className="muted">{fmt(a.createdAt)}</span>
+                  <span className="muted">{fmt(a.created_at)}</span>
                 </li>
               ))}
             </ul>

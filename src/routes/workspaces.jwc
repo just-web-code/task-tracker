@@ -1,0 +1,74 @@
+namespace routes.workspaces;
+
+import dto.requests;
+import middleware.auth;
+import services.collab;
+import services.projects;
+import services.workspaces;
+
+routes "/workspaces" use RequireAuth {
+    route GET "" {
+        return json(WorkspaceService.mine(context.user_id));
+    }
+
+    route POST "" {
+        let req = request.body() as CreateWorkspaceRequest;
+
+        return created(json(WorkspaceService.create(context.user_id, $req)));
+    }
+
+    route GET "{id: int}" {
+        WorkspaceService.require_member(@id, context.user_id);
+
+        let ws = WorkspaceService.by_id(@id)
+            or throw NotFound("ish maydoni topilmadi");
+
+        return json({
+            id:         $ws.id,
+            name:       $ws.name,
+            owner_id:   $ws.owner_id,
+            created_at: $ws.created_at,
+            members:    WorkspaceService.members(@id)
+        });
+    }
+
+    route POST "{id: int}/members" {
+        WorkspaceService.require_member(@id, context.user_id);
+
+        let req = request.body() as AddMemberRequest;
+
+        return created(json(WorkspaceService.add_member(@id, $req)));
+    }
+
+    route GET "{id: int}/projects" {
+        WorkspaceService.require_member(@id, context.user_id);
+
+        return json(ProjectService.list_by_workspace(
+            @id,
+            request.query("cursor"),
+            int(request.query("size") ?? "20")
+        ));
+    }
+
+    route POST "{id: int}/projects" {
+        WorkspaceService.require_member(@id, context.user_id);
+
+        let req = request.body() as CreateProjectRequest;
+
+        return created(json(ProjectService.create(@id, $req)));
+    }
+
+    route GET "{id: int}/labels" {
+        WorkspaceService.require_member(@id, context.user_id);
+
+        return json(LabelService.list_by_workspace(@id));
+    }
+
+    route POST "{id: int}/labels" {
+        WorkspaceService.require_member(@id, context.user_id);
+
+        let req = request.body() as CreateLabelRequest;
+
+        return created(json(LabelService.create(@id, $req)));
+    }
+}

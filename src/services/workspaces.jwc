@@ -1,0 +1,75 @@
+namespace services.workspaces;
+
+import app;
+import db.schema;
+import dto.requests;
+
+service WorkspaceService {
+    --- Creating a workspace and making its owner the first member is one
+    --- fact, so it is one transaction: a workspace nobody can reach is
+    --- worse than no workspace.
+    function create(owner_id: int, req: CreateWorkspaceRequest) {
+        transaction {
+            let ws = insert into App.public.Workspaces {
+                name       = $req.name,
+                owner_id   = $owner_id,
+                created_at = date.now()
+            } as { id, name, owner_id, created_at };
+
+            insert into App.public.WorkspaceMembers {
+                workspace_id = $ws.id,
+                user_id      = $owner_id,
+                role         = "owner"
+            };
+
+            return $ws;
+        }
+    }
+
+    --- The workspaces this user belongs to, in one statement: the join is
+    --- what the 0.9.x `with workspace` eager-load was for, and it no longer
+    --- needs a loop to unwrap.
+    function mine(user_id: int) {
+        return select M from App.public.WorkspaceMembers
+            inner join App.public.Workspaces W on W.id == M.workspace_id as one workspace
+            where user_id == $user_id
+            as { role, workspace: { id, name, owner_id, created_at } }
+            orderby M.id;
+    }
+
+    function by_id(id: int) {
+        return select W from App.public.Workspaces
+            where id == $id
+            as { id, name, owner_id, created_at }
+            first;
+    }
+
+    function members(workspace_id: int) {
+        return select M from App.public.WorkspaceMembers
+            inner join App.public.Users U on U.id == M.user_id as one user
+            where workspace_id == $workspace_id
+            as { id, user_id, role, user: { id, email, name } }
+            orderby M.id;
+    }
+
+    --- The authorisation check every route below a workspace makes. It
+    --- raises rather than answering false: every caller's next move on a
+    --- false was `return forbidden()`, and one place to say that is better
+    --- than sixteen.
+    function require_member(workspace_id: int, user_id: int) {
+        let member = select M from App.public.WorkspaceMembers
+            where workspace_id == $workspace_id and user_id == $user_id
+            as { id, role }
+            first or throw NotAMember("siz bu ish maydoni a'zosi emassiz");
+
+        return $member;
+    }
+
+    function add_member(workspace_id: int, req: AddMemberRequest) {
+        return insert into App.public.WorkspaceMembers {
+            workspace_id = $workspace_id,
+            user_id      = $req.user_id,
+            role         = $req.role
+        } as { id, workspace_id, user_id, role };
+    }
+}

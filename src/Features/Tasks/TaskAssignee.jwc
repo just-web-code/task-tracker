@@ -1,7 +1,0 @@
-// Join table: Task <-> User (N-N assignees). Surrogate id pk; uniqueness of
-// (taskId, userId) enforced in app code (addAssignee dedups).
-entity TaskAssignee of AppDb {
-    id     int pk autoincrement;
-    taskId int;
-    userId int;
-}

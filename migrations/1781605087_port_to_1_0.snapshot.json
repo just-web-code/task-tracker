@@ -1,0 +1,935 @@
+{
+  "format": 1,
+  "scheme": "v1",
+  "schemas": [
+    {
+      "name": "public",
+      "declared": "public"
+    }
+  ],
+  "tables": [
+    {
+      "schema": "public",
+      "name": "activity",
+      "declared": "Activities",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "projectId",
+          "declared": "project_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "actorId",
+          "declared": "actor_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "declared": "type",
+          "ty": "varchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "payload",
+          "declared": "payload",
+          "ty": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "declared": "created_at",
+          "ty": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_activity",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_activity__projectId",
+          "columns": [
+            "projectId"
+          ],
+          "target_schema": "public",
+          "target_table": "project",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_activity__actorId",
+          "columns": [
+            "actorId"
+          ],
+          "target_schema": "public",
+          "target_table": "user",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_activity__projectId_createdAt",
+          "columns": [
+            {
+              "name": "projectId"
+            },
+            {
+              "name": "createdAt"
+            }
+          ]
+        }
+      ],
+      "comment": "Append-only. `payload` is jsonb, so the shape is per-event and the\nreader does not have to know it."
+    },
+    {
+      "schema": "public",
+      "name": "board",
+      "declared": "Boards",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "projectId",
+          "declared": "project_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "declared": "name",
+          "ty": "varchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "declared": "position",
+          "ty": "integer",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_board",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_board__projectId",
+          "columns": [
+            "projectId"
+          ],
+          "target_schema": "public",
+          "target_table": "project",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_board__projectId_position",
+          "columns": [
+            {
+              "name": "projectId"
+            },
+            {
+              "name": "position"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "column",
+      "declared": "Columns",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "boardId",
+          "declared": "board_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "declared": "name",
+          "ty": "varchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "declared": "position",
+          "ty": "integer",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_column",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_column__boardId",
+          "columns": [
+            "boardId"
+          ],
+          "target_schema": "public",
+          "target_table": "board",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_column__boardId_position",
+          "columns": [
+            {
+              "name": "boardId"
+            },
+            {
+              "name": "position"
+            }
+          ]
+        }
+      ],
+      "comment": "`Columns`, not `Column`: `column` is a reserved word in Postgres and the\nphysical name is quoted anyway, but the plural also matches every other\ntable here."
+    },
+    {
+      "schema": "public",
+      "name": "comment",
+      "declared": "Comments",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "taskId",
+          "declared": "task_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "authorId",
+          "declared": "author_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "declared": "body",
+          "ty": "varchar(4000)",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "declared": "created_at",
+          "ty": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_comment",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_comment__taskId",
+          "columns": [
+            "taskId"
+          ],
+          "target_schema": "public",
+          "target_table": "task",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_comment__authorId",
+          "columns": [
+            "authorId"
+          ],
+          "target_schema": "public",
+          "target_table": "user",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_comment__taskId_createdAt",
+          "columns": [
+            {
+              "name": "taskId"
+            },
+            {
+              "name": "createdAt"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "label",
+      "declared": "Labels",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "workspaceId",
+          "declared": "workspace_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "declared": "name",
+          "ty": "varchar(80)",
+          "nullable": false
+        },
+        {
+          "name": "color",
+          "declared": "color",
+          "ty": "varchar(20)",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_label",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_label__workspaceId",
+          "columns": [
+            "workspaceId"
+          ],
+          "target_schema": "public",
+          "target_table": "workspace",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_label__workspaceId_name",
+          "columns": [
+            {
+              "name": "workspaceId"
+            },
+            {
+              "name": "name"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "project",
+      "declared": "Projects",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "workspaceId",
+          "declared": "workspace_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "declared": "name",
+          "ty": "varchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "declared": "description",
+          "ty": "varchar(2000)",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "declared": "created_at",
+          "ty": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_project",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_project__workspaceId",
+          "columns": [
+            "workspaceId"
+          ],
+          "target_schema": "public",
+          "target_table": "workspace",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_project__workspaceId_createdAt",
+          "columns": [
+            {
+              "name": "workspaceId"
+            },
+            {
+              "name": "createdAt"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "task",
+      "declared": "Tasks",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "columnId",
+          "declared": "column_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "projectId",
+          "declared": "project_id",
+          "ty": "integer",
+          "nullable": false,
+          "comment": "Denormalised. Every list query is per-project, and carrying the id\nhere avoids a column → board → project hop on each one. Stable: a\nmove only ever re-parents within a project, which `TaskService.move`\nenforces."
+        },
+        {
+          "name": "title",
+          "declared": "title",
+          "ty": "varchar(300)",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "declared": "description",
+          "ty": "varchar(4000)",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "declared": "status",
+          "ty": "varchar(30)",
+          "nullable": false
+        },
+        {
+          "name": "priority",
+          "declared": "priority",
+          "ty": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "position",
+          "declared": "position",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "dueDate",
+          "declared": "due_date",
+          "ty": "timestamptz",
+          "nullable": true
+        },
+        {
+          "name": "createdById",
+          "declared": "created_by_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "declared": "created_at",
+          "ty": "timestamptz",
+          "nullable": false
+        },
+        {
+          "name": "updatedAt",
+          "declared": "updated_at",
+          "ty": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_task",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_task__columnId",
+          "columns": [
+            "columnId"
+          ],
+          "target_schema": "public",
+          "target_table": "column",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_task__projectId",
+          "columns": [
+            "projectId"
+          ],
+          "target_schema": "public",
+          "target_table": "project",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_task__createdById",
+          "columns": [
+            "createdById"
+          ],
+          "target_schema": "public",
+          "target_table": "user",
+          "target_columns": [
+            "id"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_task__projectId_position",
+          "columns": [
+            {
+              "name": "projectId"
+            },
+            {
+              "name": "position"
+            }
+          ]
+        },
+        {
+          "name": "ix_task__columnId_position",
+          "columns": [
+            {
+              "name": "columnId"
+            },
+            {
+              "name": "position"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "task_assignee",
+      "declared": "TaskAssignees",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "taskId",
+          "declared": "task_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "userId",
+          "declared": "user_id",
+          "ty": "integer",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_task_assignee",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniques": [
+        {
+          "name": "uq_task_assignee__taskId_userId",
+          "columns": [
+            "taskId",
+            "userId"
+          ]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "name": "fk_task_assignee__taskId",
+          "columns": [
+            "taskId"
+          ],
+          "target_schema": "public",
+          "target_table": "task",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_task_assignee__userId",
+          "columns": [
+            "userId"
+          ],
+          "target_schema": "public",
+          "target_table": "user",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "comment": "Join table: Task ↔ User."
+    },
+    {
+      "schema": "public",
+      "name": "task_label",
+      "declared": "TaskLabels",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "taskId",
+          "declared": "task_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "labelId",
+          "declared": "label_id",
+          "ty": "integer",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_task_label",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniques": [
+        {
+          "name": "uq_task_label__taskId_labelId",
+          "columns": [
+            "taskId",
+            "labelId"
+          ]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "name": "fk_task_label__taskId",
+          "columns": [
+            "taskId"
+          ],
+          "target_schema": "public",
+          "target_table": "task",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_task_label__labelId",
+          "columns": [
+            "labelId"
+          ],
+          "target_schema": "public",
+          "target_table": "label",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "comment": "Join table: Task ↔ Label. The pair is unique, which is what makes\n`addLabel` idempotent without a read first."
+    },
+    {
+      "schema": "public",
+      "name": "user",
+      "declared": "Users",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "email",
+          "declared": "email",
+          "ty": "varchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "passwordHash",
+          "declared": "password_hash",
+          "ty": "varchar(255)",
+          "nullable": false,
+          "comment": "Argon2id. `private` keeps it out of every projection, so a `select`\ncannot leak it even by asking (schema.md §3.1)."
+        },
+        {
+          "name": "name",
+          "declared": "name",
+          "ty": "varchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "declared": "created_at",
+          "ty": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_user",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniques": [
+        {
+          "name": "uq_user__email",
+          "columns": [
+            "email"
+          ]
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_user__createdAt",
+          "columns": [
+            {
+              "name": "createdAt"
+            }
+          ]
+        }
+      ],
+      "comment": "Every table and column below carries an `as \"…\"` override: the physical\nnames are what the 0.9.x deployment created, and they are not what 1.0\nwould spell them. See `app.jwc` for why they are kept.\nOne human identity. Email is the login handle."
+    },
+    {
+      "schema": "public",
+      "name": "workspace",
+      "declared": "Workspaces",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "name",
+          "declared": "name",
+          "ty": "varchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "ownerId",
+          "declared": "owner_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "declared": "created_at",
+          "ty": "timestamptz",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_workspace",
+        "columns": [
+          "id"
+        ]
+      },
+      "foreign_keys": [
+        {
+          "name": "fk_workspace__ownerId",
+          "columns": [
+            "ownerId"
+          ],
+          "target_schema": "public",
+          "target_table": "user",
+          "target_columns": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "workspace_member",
+      "declared": "WorkspaceMembers",
+      "columns": [
+        {
+          "name": "id",
+          "declared": "id",
+          "ty": "integer",
+          "nullable": false,
+          "identity": true
+        },
+        {
+          "name": "workspaceId",
+          "declared": "workspace_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "userId",
+          "declared": "user_id",
+          "ty": "integer",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "declared": "role",
+          "ty": "varchar(20)",
+          "nullable": false
+        }
+      ],
+      "primary_key": {
+        "name": "pk_workspace_member",
+        "columns": [
+          "id"
+        ]
+      },
+      "uniques": [
+        {
+          "name": "uq_workspace_member__workspaceId_userId",
+          "columns": [
+            "workspaceId",
+            "userId"
+          ]
+        }
+      ],
+      "foreign_keys": [
+        {
+          "name": "fk_workspace_member__workspaceId",
+          "columns": [
+            "workspaceId"
+          ],
+          "target_schema": "public",
+          "target_table": "workspace",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "name": "fk_workspace_member__userId",
+          "columns": [
+            "userId"
+          ],
+          "target_schema": "public",
+          "target_table": "user",
+          "target_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ix_workspace_member__userId",
+          "columns": [
+            {
+              "name": "userId"
+            }
+          ]
+        }
+      ],
+      "comment": "The authorisation table. Every read below a workspace goes through it."
+    }
+  ]
+}

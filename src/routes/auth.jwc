@@ -1,0 +1,19 @@
+namespace routes.auth;
+
+import dto.requests;
+import services.auth;
+
+routes "/auth" {
+    route POST "register" {
+        let req = request.body() as RegisterRequest;
+        let account = AuthService.register($req);
+
+        return created(json($account));
+    }
+
+    route POST "login" {
+        let req = request.body() as LoginRequest;
+
+        return json(AuthService.login($req));
+    }
+}
