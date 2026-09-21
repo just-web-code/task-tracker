@@ -6,63 +6,86 @@ import dto.requests;
 
 service ProjectService {
     function create(workspace_id: int, req: CreateProjectRequest) {
-        return insert into App.public.Projects {
-            workspace_id = $workspace_id,
-            name         = $req.name,
-            description  = $req.description ?? "",
+        return insert Projects into App.public.Projects {
+            workspace_id = @workspace_id,
+            name         = @req.name,
+            description  = @req.description ?? "",
             created_at   = date.now()
-        } as { id, workspace_id, name, description, created_at };
+        }
+            as {
+                Projects.id,
+                Projects.workspace_id,
+                Projects.name,
+                Projects.description,
+                Projects.created_at
+            };
     }
 
-    --- Keyset pagination, not offset: the 0.9.x version paged with
-    --- `limit @limit offset @offset`, which re-scans everything before the
-    --- page and drifts when a row is inserted mid-scroll (queries.md §9).
+    /// Keyset pagination, not offset: the 0.9.x version paged with
+    /// `limit @limit offset @offset`, which re-scans everything before the
+    /// page and drifts when a row is inserted mid-scroll (queries.md §9).
     function list_by_workspace(workspace_id: int, cursor: text?, size: int) {
         return select P from App.public.Projects
-            where workspace_id == $workspace_id
-            as { id, workspace_id, name, description, created_at }
-            orderby created_at asc, id asc
-            page after $cursor size $size;
+            where P.workspace_id == @workspace_id
+            as { P.id, P.workspace_id, P.name, P.description, P.created_at }
+            orderby P.created_at asc, P.id asc
+            page after @cursor size @size;
     }
 
     function by_id(id: int) {
         return select P from App.public.Projects
-            where id == $id
-            as { id, workspace_id, name, description, created_at }
+            where P.id == @id
+            as { P.id, P.workspace_id, P.name, P.description, P.created_at }
             first;
     }
 
-    --- Project + boards + each board's columns, in one statement. The 0.9.x
-    --- `with boards.columns` two-level eager load is two `as many` joins,
-    --- and `under` is what nests the second inside the first.
+    /// Project + boards + each board's columns, in one statement. The 0.9.x
+    /// `with boards.columns` two-level eager load is two `as many` joins,
+    /// and `under` is what nests the second inside the first.
     function detail(id: int) {
         return select P from App.public.Projects
             left join App.public.Boards B on B.project_id == P.id as many boards orderby position asc limit 100
             left join App.public.Columns C on C.board_id == B.id as many columns under boards orderby position asc limit 100
-            where P.id == $id
+            where P.id == @id
             as {
-                id, workspace_id, name, description, created_at,
-                boards: { id, name, position, columns: { id, name, position } }
+                P.id,
+                P.workspace_id,
+                P.name,
+                P.description,
+                P.created_at,
+                boards: {
+                    B.id,
+                    B.name,
+                    B.position,
+                    columns: { C.id, C.name, C.position }
+                }
             }
             first;
     }
 
-    --- PATCH. `=?` skips the assignment when the value is absent, so a body
-    --- that sends only `name` leaves `description` alone — which is what
-    --- the 0.9.x load-mutate-save loop was doing by hand, without the
-    --- lost-update window between the read and the write (writes.md §3.3).
+    /// PATCH. `=?` skips the assignment when the value is absent, so a body
+    /// that sends only `name` leaves `description` alone — which is what
+    /// the 0.9.x load-mutate-save loop was doing by hand, without the
+    /// lost-update window between the read and the write (writes.md §3.3).
     function update(id: int, req: UpdateProjectRequest) {
-        return update App.public.Projects
-            set name =? $req.name, description =? $req.description
-            where id == $id
-            as { id, workspace_id, name, description, created_at }
+        return update Projects of App.public.Projects
+            set name =? @req.name, description =? @req.description
+            where Projects.id == @id
+            as {
+                Projects.id,
+                Projects.workspace_id,
+                Projects.name,
+                Projects.description,
+                Projects.created_at
+            }
             first or throw NotFound("loyiha topilmadi");
     }
 
-    --- One statement. The 0.9.x version walked boards → columns → project
-    --- in a transaction because no FK declared a cascade; they do now, so
-    --- the database does it.
+    /// One statement. The 0.9.x version walked boards → columns → project
+    /// in a transaction because no FK declared a cascade; they do now, so
+    /// the database does it.
     function delete_deep(id: int) {
-        delete from App.public.Projects where id == $id;
+        delete Projects from App.public.Projects
+            where Projects.id == @id;
     }
 }

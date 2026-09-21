@@ -5,28 +5,30 @@ import db.schema;
 import dto.requests;
 
 service BoardService {
-    --- The new board goes at the end. `count(*) + 1` reads and writes in
-    --- two statements, so two concurrent creates can pick the same
-    --- position; the 0.9.x version had the same race and the same reason
-    --- not to care — a board list re-orders on the client anyway, and a
-    --- unique constraint here would reject a legitimate create.
+    /// The new board goes at the end. `count(*) + 1` reads and writes in
+    /// two statements, so two concurrent creates can pick the same
+    /// position; the 0.9.x version had the same race and the same reason
+    /// not to care — a board list re-orders on the client anyway, and a
+    /// unique constraint here would reject a legitimate create.
     function create(project_id: int, req: CreateBoardRequest) {
         let n = select B from App.public.Boards
-            where project_id == $project_id
-            as { total: count(id) }
+            where B.project_id == @project_id
+            as {
+                total: count(B.id)
+            }
             first;
 
-        return insert into App.public.Boards {
-            project_id = $project_id,
-            name       = $req.name,
-            position   = $n.total + 1
-        } as { id, project_id, name, position };
+        return insert Boards into App.public.Boards {
+            project_id = @project_id,
+            name       = @req.name,
+            position   = @n.total + 1
+        } as { Boards.id, Boards.project_id, Boards.name, Boards.position };
     }
 
     function by_id(id: int) {
         return select B from App.public.Boards
-            where id == $id
-            as { id, project_id, name, position }
+            where B.id == @id
+            as { B.id, B.project_id, B.name, B.position }
             first;
     }
 }
@@ -34,29 +36,31 @@ service BoardService {
 service ColumnService {
     function create(board_id: int, req: CreateColumnRequest) {
         let n = select C from App.public.Columns
-            where board_id == $board_id
-            as { total: count(id) }
+            where C.board_id == @board_id
+            as {
+                total: count(C.id)
+            }
             first;
 
-        return insert into App.public.Columns {
-            board_id = $board_id,
-            name     = $req.name,
-            position = $n.total + 1
-        } as { id, board_id, name, position };
+        return insert Columns into App.public.Columns {
+            board_id = @board_id,
+            name     = @req.name,
+            position = @n.total + 1
+        } as { Columns.id, Columns.board_id, Columns.name, Columns.position };
     }
 
     function by_id(id: int) {
         return select C from App.public.Columns
-            where id == $id
-            as { id, board_id, name, position }
+            where C.id == @id
+            as { C.id, C.board_id, C.name, C.position }
             first;
     }
 
     function update(id: int, req: UpdateColumnRequest) {
-        return update App.public.Columns
-            set name =? $req.name, position =? $req.position
-            where id == $id
-            as { id, board_id, name, position }
+        return update Columns of App.public.Columns
+            set name =? @req.name, position =? @req.position
+            where Columns.id == @id
+            as { Columns.id, Columns.board_id, Columns.name, Columns.position }
             first or throw NotFound("ustun topilmadi");
     }
 }

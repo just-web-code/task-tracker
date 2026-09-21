@@ -8,6 +8,7 @@ labels and assignees, an audit feed and three grouped aggregates.
 ## Layout
 
 ```
+jwcproj.json                the manifest; names the release the source is for
 src/app.jwc                 database, schema, server config, declared errors
 src/db/schema.jwc           every table
 src/dto/requests.jwc        every request class, with its validation rules
@@ -31,6 +32,10 @@ export CURSOR_SECRET=...       # required: signs the pagination cursors
 jwc migrate up .
 jwc serve .                    # or: jwc build . && ./bin/debug/app
 ```
+
+The port is `server { port = 8080; }`; `--port`, `JWC_PORT` and `PORT`
+override it in that order. Requires jwc 1.0.0-rc.7 — `jwcproj.json` names
+it, and another release refuses the project.
 
 `jwc build .` produces a single native binary. It is verified against
 `jwc serve` the only way that means anything: both run against the same

@@ -11,23 +11,23 @@ import services.workspaces;
 routes "/projects" use RequireAuth {
     route GET "{id: int}" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         return json(ProjectService.detail(@id));
     }
 
     route PATCH "{id: int}" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         let req = request.body() as UpdateProjectRequest;
 
-        return json(ProjectService.update(@id, $req));
+        return json(ProjectService.update(@id, @req));
     }
 
     route DELETE "{id: int}" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         ProjectService.delete_deep(@id);
 
@@ -36,40 +36,42 @@ routes "/projects" use RequireAuth {
 
     route POST "{id: int}/boards" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         let req = request.body() as CreateBoardRequest;
 
-        return created(json(BoardService.create(@id, $req)));
+        return created(json(BoardService.create(@id, @req)));
     }
 
     route GET "{id: int}/tasks" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
-        return json(TaskService.list_by_project(
-            @id,
-            request.query("status"),
-            request.query("priority"),
-            request.query("cursor"),
-            int(request.query("size") ?? "20")
-        ));
+        return json(
+            TaskService.list_by_project(
+                @id,
+                request.query("status"),
+                request.query("priority"),
+                request.query("cursor"),
+                int(request.query("size") ?? "20")
+            )
+        );
     }
 
     route GET "{id: int}/activity" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         return json(ActivityService.list_by_project(@id));
     }
 
     route GET "{id: int}/stats" {
         let p = ProjectService.by_id(@id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         return json({
-            by_status:   StatsService.by_status(@id),
-            by_column:   StatsService.by_column(@id),
+            by_status: StatsService.by_status(@id),
+            by_column: StatsService.by_column(@id),
             by_assignee: StatsService.by_assignee(@id)
         });
     }
@@ -78,43 +80,43 @@ routes "/projects" use RequireAuth {
 routes "/boards" use RequireAuth {
     route POST "{id: int}/columns" {
         let b = BoardService.by_id(@id) or throw NotFound("doska topilmadi");
-        let p = ProjectService.by_id($b.project_id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        let p = ProjectService.by_id(@b.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         let req = request.body() as CreateColumnRequest;
 
-        return created(json(ColumnService.create(@id, $req)));
+        return created(json(ColumnService.create(@id, @req)));
     }
 }
 
 routes "/columns" use RequireAuth {
     route PATCH "{id: int}" {
         let c = ColumnService.by_id(@id) or throw NotFound("ustun topilmadi");
-        let b = BoardService.by_id($c.board_id) or throw NotFound("doska topilmadi");
-        let p = ProjectService.by_id($b.project_id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        let b = BoardService.by_id(@c.board_id) or throw NotFound("doska topilmadi");
+        let p = ProjectService.by_id(@b.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         let req = request.body() as UpdateColumnRequest;
 
-        return json(ColumnService.update(@id, $req));
+        return json(ColumnService.update(@id, @req));
     }
 
     route POST "{id: int}/tasks" {
         let c = ColumnService.by_id(@id) or throw NotFound("ustun topilmadi");
-        let b = BoardService.by_id($c.board_id) or throw NotFound("doska topilmadi");
-        let p = ProjectService.by_id($b.project_id) or throw NotFound("loyiha topilmadi");
-        WorkspaceService.require_member($p.workspace_id, context.user_id);
+        let b = BoardService.by_id(@c.board_id) or throw NotFound("doska topilmadi");
+        let p = ProjectService.by_id(@b.project_id) or throw NotFound("loyiha topilmadi");
+        WorkspaceService.require_member(@p.workspace_id, context.user_id);
 
         let req = request.body() as CreateTaskRequest;
-        let task = TaskService.create(@id, $b.project_id, context.user_id, $req);
+        let task = TaskService.create(@id, @b.project_id, context.user_id, @req);
 
         ActivityService.record(
-            $b.project_id,
+            @b.project_id,
             context.user_id,
             "task.created",
-            { task_id: $task.id, title: $task.title }
+            { task_id: @task.id, title: @task.title }
         );
 
-        return created(json($task));
+        return created(json(@task));
     }
 }

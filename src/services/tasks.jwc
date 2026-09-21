@@ -7,203 +7,253 @@ import dto.requests;
 service TaskService {
     function create(column_id: int, project_id: int, created_by_id: int, req: CreateTaskRequest) {
         let n = select T from App.public.Tasks
-            where column_id == $column_id
-            as { total: count(id) }
+            where T.column_id == @column_id
+            as {
+                total: count(T.id)
+            }
             first;
 
         let now = date.now();
 
-        return insert into App.public.Tasks {
-            column_id     = $column_id,
-            project_id    = $project_id,
-            title         = $req.title,
-            --- The 0.9.x service set these three defaults and the schema
-            --- has no DEFAULT for them, so the port keeps them here: a
-            --- body that omits `status` gets `todo`, not a 500 on the
-            --- NOT NULL.
-            description   = $req.description ?? "",
-            status        = $req.status ?? "todo",
-            priority      = $req.priority ?? "medium",
-            position      = $n.total + 1,
-            due_date      = $req.due_date,
-            created_by_id = $created_by_id,
-            created_at    = $now,
-            updated_at    = $now
-        } as {
-            id, column_id, project_id, title, description,
-            status, priority, position, due_date, created_by_id,
-            created_at, updated_at
-        };
+        return insert Tasks into App.public.Tasks {
+            column_id     = @column_id,
+            project_id    = @project_id,
+            title         = @req.title,
+            /// The 0.9.x service set these three defaults and the schema
+            /// has no DEFAULT for them, so the port keeps them here: a
+            /// body that omits `status` gets `todo`, not a 500 on the
+            /// NOT NULL.
+            description   = @req.description ?? "",
+            status        = @req.status ?? "todo",
+            priority      = @req.priority ?? "medium",
+            position      = @n.total + 1,
+            due_date      = @req.due_date,
+            created_by_id = @created_by_id,
+            created_at    = @now,
+            updated_at    = @now
+        }
+            as {
+                Tasks.id,
+                Tasks.column_id,
+                Tasks.project_id,
+                Tasks.title,
+                Tasks.description,
+                Tasks.status,
+                Tasks.priority,
+                Tasks.position,
+                Tasks.due_date,
+                Tasks.created_by_id,
+                Tasks.created_at,
+                Tasks.updated_at
+            };
     }
 
     function by_id(id: int) {
         return select T from App.public.Tasks
-            where id == $id
-            as { id, column_id, project_id, title, position, status }
+            where T.id == @id
+            as { T.id, T.column_id, T.project_id, T.title, T.position, T.status }
             first;
     }
 
-    --- A task with its labels and its assignees.
-    ---
-    --- Three statements, not one. The 0.9.x version had
-    --- `select Task with labels, assignees` and got a single query; 1.0
-    --- refuses a query that carries an `as many` collection reached through
-    --- a link table together with another (E0532, queries.md §6.2,
-    --- DEFERRED-12), and the alternative — making the *link* the collection
-    --- — nests as `labels: [{ label: {…} }]`, which is a worse wire shape
-    --- than the extra round-trip. This is a task-detail fetch, not a list
-    --- path, so three queries is the right trade; it is a real regression
-    --- against 0.9.x and worth revisiting when DEFERRED-12 lands.
+    /// A task with its labels and its assignees.
+    ///
+    /// Three statements, not one. The 0.9.x version had
+    /// `select Task with labels, assignees` and got a single query; 1.0
+    /// refuses a query that carries an `as many` collection reached through
+    /// a link table together with another (E0532, queries.md §6.2,
+    /// DEFERRED-12), and the alternative — making the *link* the collection
+    /// — nests as `labels: [{ label: {…} }]`, which is a worse wire shape
+    /// than the extra round-trip. This is a task-detail fetch, not a list
+    /// path, so three queries is the right trade; it is a real regression
+    /// against 0.9.x and worth revisiting when DEFERRED-12 lands.
     function detail(id: int) {
         let task = select T from App.public.Tasks
-            where id == $id
+            where T.id == @id
             as {
-                id, column_id, project_id, title, description,
-                status, priority, position, due_date, created_by_id,
-                created_at, updated_at
+                T.id,
+                T.column_id,
+                T.project_id,
+                T.title,
+                T.description,
+                T.status,
+                T.priority,
+                T.position,
+                T.due_date,
+                T.created_by_id,
+                T.created_at,
+                T.updated_at
             }
             first or throw NotFound("vazifa topilmadi");
 
         let labels = select TL from App.public.TaskLabels
             inner join App.public.Labels L on L.id == TL.label_id as one label
-            where task_id == $id
-            as { label: { id, name, color } }
-            orderby TL.id
+            where TL.task_id == @id
+            as {
+                label: { L.id, L.name, L.color }
+            }
+            orderby TL.id asc
             limit 50;
 
-        --- `password_hash` is `private` and cannot appear in a projection
-        --- at all; naming the three that do belong is how the endpoint
-        --- stays honest when a column is added later.
+        /// `password_hash` is `private` and cannot appear in a projection
+        /// at all; naming the three that do belong is how the endpoint
+        /// stays honest when a column is added later.
         let assignees = select TA from App.public.TaskAssignees
             inner join App.public.Users U on U.id == TA.user_id as one user
-            where task_id == $id
-            as { user: { id, email, name } }
-            orderby TA.id
+            where TA.task_id == @id
+            as {
+                user: { U.id, U.email, U.name }
+            }
+            orderby TA.id asc
             limit 50;
 
         return {
-            id:            $task.id,
-            column_id:     $task.column_id,
-            project_id:    $task.project_id,
-            title:         $task.title,
-            description:   $task.description,
-            status:        $task.status,
-            priority:      $task.priority,
-            position:      $task.position,
-            due_date:      $task.due_date,
-            created_by_id: $task.created_by_id,
-            created_at:    $task.created_at,
-            updated_at:    $task.updated_at,
-            labels:        array.pluck($labels, "label"),
-            assignees:     array.pluck($assignees, "user")
+            id: @task.id,
+            column_id: @task.column_id,
+            project_id: @task.project_id,
+            title: @task.title,
+            description: @task.description,
+            status: @task.status,
+            priority: @task.priority,
+            position: @task.position,
+            due_date: @task.due_date,
+            created_by_id: @task.created_by_id,
+            created_at: @task.created_at,
+            updated_at: @task.updated_at,
+            labels: array.pluck(@labels, "label"),
+            assignees: array.pluck(@assignees, "user")
         };
     }
 
     function update(id: int, req: UpdateTaskRequest) {
-        return update App.public.Tasks
-            set title       =? $req.title,
-                description =? $req.description,
-                status      =? $req.status,
-                priority    =? $req.priority,
-                due_date    =? $req.due_date,
-                updated_at  = date.now()
-            where id == $id
+        return update Tasks of App.public.Tasks
+            set
+                title =? @req.title,
+                description =? @req.description,
+                status =? @req.status,
+                priority =? @req.priority,
+                due_date =? @req.due_date,
+                updated_at = date.now()
+            where Tasks.id == @id
             as {
-                id, column_id, project_id, title, description,
-                status, priority, position, due_date, created_by_id,
-                created_at, updated_at
+                Tasks.id,
+                Tasks.column_id,
+                Tasks.project_id,
+                Tasks.title,
+                Tasks.description,
+                Tasks.status,
+                Tasks.priority,
+                Tasks.position,
+                Tasks.due_date,
+                Tasks.created_by_id,
+                Tasks.created_at,
+                Tasks.updated_at
             }
             first or throw NotFound("vazifa topilmadi");
     }
 
-    --- Reorder, in one transaction and with every position change done by
-    --- the database. `set position = position - 1` reads the row it writes,
-    --- so it stays gap-free under concurrency — computing the new value
-    --- here would need a read first, and two callers doing that both read
-    --- the same number (writes.md §2.3).
+    /// Reorder, in one transaction and with every position change done by
+    /// the database. `set position = position - 1` reads the row it writes,
+    /// so it stays gap-free under concurrency — computing the new value
+    /// here would need a read first, and two callers doing that both read
+    /// the same number (writes.md §2.3).
     function move(id: int, old_column_id: int, old_position: int, req: MoveTaskRequest) {
         transaction {
-            if ($old_column_id == $req.column_id) {
-                if ($req.position > $old_position) {
-                    update App.public.Tasks
-                        set position = position - 1
-                        where column_id == $req.column_id
-                          and position > $old_position
-                          and position <= $req.position;
+            if (@old_column_id == @req.column_id) {
+                if (@req.position > @old_position) {
+                    update Tasks of App.public.Tasks
+                        set position = Tasks.position - 1
+                        where Tasks.column_id == @req.column_id and Tasks.position > @old_position and Tasks.position <= @req.position;
                 }
-                if ($req.position < $old_position) {
-                    update App.public.Tasks
-                        set position = position + 1
-                        where column_id == $req.column_id
-                          and position >= $req.position
-                          and position < $old_position;
+                if (@req.position < @old_position) {
+                    update Tasks of App.public.Tasks
+                        set position = Tasks.position + 1
+                        where Tasks.column_id == @req.column_id and Tasks.position >= @req.position and Tasks.position < @old_position;
                 }
             } else {
-                --- Close the gap in the source column, open one in the target.
-                update App.public.Tasks
-                    set position = position - 1
-                    where column_id == $old_column_id and position > $old_position;
+                /// Close the gap in the source column, open one in the target.
+                update Tasks of App.public.Tasks
+                    set position = Tasks.position - 1
+                    where Tasks.column_id == @old_column_id and Tasks.position > @old_position;
 
-                update App.public.Tasks
-                    set position = position + 1
-                    where column_id == $req.column_id and position >= $req.position;
+                update Tasks of App.public.Tasks
+                    set position = Tasks.position + 1
+                    where Tasks.column_id == @req.column_id and Tasks.position >= @req.position;
             }
 
-            return update App.public.Tasks
-                set column_id  = $req.column_id,
-                    position   = $req.position,
+            return update Tasks of App.public.Tasks
+                set
+                    column_id = @req.column_id,
+                    position = @req.position,
                     updated_at = date.now()
-                where id == $id
+                where Tasks.id == @id
                 as {
-                    id, column_id, project_id, title, description,
-                    status, priority, position, due_date, created_by_id,
-                    created_at, updated_at
+                    Tasks.id,
+                    Tasks.column_id,
+                    Tasks.project_id,
+                    Tasks.title,
+                    Tasks.description,
+                    Tasks.status,
+                    Tasks.priority,
+                    Tasks.position,
+                    Tasks.due_date,
+                    Tasks.created_by_id,
+                    Tasks.created_at,
+                    Tasks.updated_at
                 }
                 first or throw NotFound("vazifa topilmadi");
         }
     }
 
-    --- Filter and page, entirely in the database. `==?` drops the predicate
-    --- when the value is absent, so one static query covers every filter
-    --- combination — no branch here and no fetch-then-filter.
+    /// Filter and page, entirely in the database. `==?` drops the predicate
+    /// when the value is absent, so one static query covers every filter
+    /// combination — no branch here and no fetch-then-filter.
     function list_by_project(project_id: int, status: text?, priority: text?, cursor: text?, size: int) {
         return select T from App.public.Tasks
-            where project_id == $project_id
-              and status ==? $status
-              and priority ==? $priority
+            where T.project_id == @project_id and T.status ==? @status and T.priority ==? @priority
             as {
-                id, column_id, project_id, title, description,
-                status, priority, position, due_date, created_by_id,
-                created_at, updated_at
+                T.id,
+                T.column_id,
+                T.project_id,
+                T.title,
+                T.description,
+                T.status,
+                T.priority,
+                T.position,
+                T.due_date,
+                T.created_by_id,
+                T.created_at,
+                T.updated_at
             }
-            orderby position asc, id asc
-            page after $cursor size $size;
+            orderby T.position asc, T.id asc
+            page after @cursor size @size;
     }
 
-    --- The unique constraint on (task_id, label_id) is what makes this
-    --- idempotent. `on conflict do nothing` is the statement saying so;
-    --- the 0.9.x version read first and inserted, which is a race.
+    /// The unique constraint on (task_id, label_id) is what makes this
+    /// idempotent. `on conflict do nothing` is the statement saying so;
+    /// the 0.9.x version read first and inserted, which is a race.
     function add_label(task_id: int, label_id: int) {
-        insert into App.public.TaskLabels {
-            task_id  = $task_id,
-            label_id = $label_id
-        } on conflict (task_id, label_id) do nothing;
+        insert TaskLabels into App.public.TaskLabels {
+            task_id  = @task_id,
+            label_id = @label_id
+        }
+            on conflict (task_id, label_id) do nothing;
     }
 
     function remove_label(task_id: int, label_id: int) {
-        delete from App.public.TaskLabels
-            where task_id == $task_id and label_id == $label_id;
+        delete TaskLabels from App.public.TaskLabels
+            where TaskLabels.task_id == @task_id and TaskLabels.label_id == @label_id;
     }
 
     function add_assignee(task_id: int, user_id: int) {
-        insert into App.public.TaskAssignees {
-            task_id = $task_id,
-            user_id = $user_id
-        } on conflict (task_id, user_id) do nothing;
+        insert TaskAssignees into App.public.TaskAssignees {
+            task_id = @task_id,
+            user_id = @user_id
+        }
+            on conflict (task_id, user_id) do nothing;
     }
 
     function remove_assignee(task_id: int, user_id: int) {
-        delete from App.public.TaskAssignees
-            where task_id == $task_id and user_id == $user_id;
+        delete TaskAssignees from App.public.TaskAssignees
+            where TaskAssignees.task_id == @task_id and TaskAssignees.user_id == @user_id;
     }
 }

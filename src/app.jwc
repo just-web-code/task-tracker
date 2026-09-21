@@ -1,40 +1,42 @@
 namespace app;
 
---- task-tracker — a Trello/Linear-lite board API, and the JWC dogfooding
---- build that goes with it.
----
---- Ported from 0.9.x. Two things about that port are worth knowing before
---- reading the schema:
----
----   1. The physical names are the ones the 0.9.x deployment created, and
----      they are camelCase (`"passwordHash"`, `"workspaceId"`) with singular
----      table names (`"user"`, `"workspace_member"`). 1.0 requires
----      snake_case in source (names.md §3.2), so every one of them carries
----      an `as "…"` override. Renaming the columns instead would need a
----      migration over live rows for no gain.
----
----   2. The wire *does* change: a projection's keys are the declared names,
----      so `workspaceId` in a response is now `workspace_id`. The React
----      client is updated in the same commit.
-
+/// task-tracker — a Trello/Linear-lite board API, and the JWC dogfooding
+/// build that goes with it.
+///
+/// Ported from 0.9.x. Two things about that port are worth knowing before
+/// reading the schema:
+///
+/// 1. The physical names are the ones the 0.9.x deployment created, and
+/// they are camelCase (`"passwordHash"`, `"workspaceId"`) with singular
+/// table names (`"user"`, `"workspace_member"`). 1.0 requires
+/// snake_case in source (names.md §3.2), so every one of them carries
+/// an `as "…"` override. Renaming the columns instead would need a
+/// migration over live rows for no gain.
+///
+/// 2. The wire *does* change: a projection's keys are the declared names,
+/// so `workspaceId` in a response is now `workspace_id`. The React
+/// client is updated in the same commit.
 database App : Postgres;
 
---- `public`, because that is where the 0.9.x deployment put them.
+/// `public`, because that is where the 0.9.x deployment put them.
 schema public of App;
 
 server {
+    /// `serve()` takes no port in 1.0: it is `port` here, overridden by
+    /// `--port`, `JWC_PORT` and `PORT` in that order (config.md §3.2.2).
+    port           = 8080;
     max_body_bytes = 65536;
     max_page_size  = 100;
-    --- A keyset cursor is a client-supplied predicate; unsigned, it is a
-    --- second filter nobody checked (config.md §3).
+    /// A keyset cursor is a client-supplied predicate; unsigned, it is a
+    /// second filter nobody checked (config.md §3).
     cursor_secret  = env("CURSOR_SECRET");
 }
 
---- Membership is the authorisation boundary for everything below a
---- workspace: a project, a board, a column, a task, a comment and a label
---- are all reachable only by a member of the workspace they hang from.
+/// Membership is the authorisation boundary for everything below a
+/// workspace: a project, a board, a column, a task, a comment and a label
+/// are all reachable only by a member of the workspace they hang from.
 error NotAMember(message: text) = 403 : "siz bu ish maydoni a'zosi emassiz";
 
 function main() {
-    serve(int(env("PORT") ?? "8080"));
+    serve();
 }

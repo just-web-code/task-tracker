@@ -5,36 +5,36 @@ import db.schema;
 import dto.requests;
 
 service AuthService {
-    --- Registration. The unique constraint on `email` is what rejects a
-    --- duplicate — checking first and then inserting is a race, and the
-    --- constraint carries the message the client sees (errors.md §6).
+    /// Registration. The unique constraint on `email` is what rejects a
+    /// duplicate — checking first and then inserting is a race, and the
+    /// constraint carries the message the client sees (errors.md §6).
     function register(req: RegisterRequest) {
-        let password_hash = hash.password($req.password);
+        let password_hash = hash.password(@req.password);
 
-        return insert into App.public.Users {
-            email         = $req.email,
-            password_hash = $password_hash,
-            name          = $req.name,
+        return insert Users into App.public.Users {
+            email         = @req.email,
+            password_hash = @password_hash,
+            name          = @req.name,
             created_at    = date.now()
-        } as { id, email, name, created_at };
+        } as { Users.id, Users.email, Users.name, Users.created_at };
     }
 
-    --- 401 for both failures, and the same message: telling an attacker
-    --- which addresses exist is the whole of the enumeration attack.
+    /// 401 for both failures, and the same message: telling an attacker
+    /// which addresses exist is the whole of the enumeration attack.
     function login(req: LoginRequest) {
         let account = select U from App.public.Users
-            where email == $req.email
-            as { id, email, name, password_hash }
+            where U.email == @req.email
+            as { U.id, U.email, U.name, U.password_hash }
             first or throw Unauthorized("email yoki parol noto'g'ri");
 
-        let ok = hash.verify($req.password, $account.password_hash);
-        if (!$ok) {
+        let ok = hash.verify(@req.password, @account.password_hash);
+        if (!@ok) {
             throw Unauthorized("email yoki parol noto'g'ri");
         }
 
         let secret = env("JWT_SECRET") or throw Unauthorized("server sozlanmagan");
-        let token = jwt.sign({ sub: string.of($account.id) }, $secret, 1440);
+        let token = jwt.sign({ sub: string.of(@account.id) }, @secret, 1440);
 
-        return { token: $token };
+        return { token: @token };
     }
 }

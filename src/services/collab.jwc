@@ -6,62 +6,75 @@ import dto.requests;
 
 service LabelService {
     function create(workspace_id: int, req: CreateLabelRequest) {
-        return insert into App.public.Labels {
-            workspace_id = $workspace_id,
-            name         = $req.name,
-            --- The 0.9.x default.
-            color        = $req.color ?? "#888888"
-        } as { id, workspace_id, name, color };
+        return insert Labels into App.public.Labels {
+            workspace_id = @workspace_id,
+            name         = @req.name,
+            /// The 0.9.x default.
+            color        = @req.color ?? "#888888"
+        } as { Labels.id, Labels.workspace_id, Labels.name, Labels.color };
     }
 
     function list_by_workspace(workspace_id: int) {
         return select L from App.public.Labels
-            where workspace_id == $workspace_id
-            as { id, workspace_id, name, color }
-            orderby name asc
+            where L.workspace_id == @workspace_id
+            as { L.id, L.workspace_id, L.name, L.color }
+            orderby L.name asc
             limit 200;
     }
 
     function by_id(id: int) {
         return select L from App.public.Labels
-            where id == $id
-            as { id, workspace_id, name, color }
+            where L.id == @id
+            as { L.id, L.workspace_id, L.name, L.color }
             first;
     }
 }
 
 service CommentService {
     function create(task_id: int, author_id: int, req: CreateCommentRequest) {
-        return insert into App.public.Comments {
-            task_id    = $task_id,
-            author_id  = $author_id,
-            body       = $req.body,
+        return insert Comments into App.public.Comments {
+            task_id    = @task_id,
+            author_id  = @author_id,
+            body       = @req.body,
             created_at = date.now()
-        } as { id, task_id, author_id, body, created_at };
+        }
+            as {
+                Comments.id,
+                Comments.task_id,
+                Comments.author_id,
+                Comments.body,
+                Comments.created_at
+            };
     }
 
-    --- `as one author` is the belongs-to eager load: one query, no N+1,
-    --- and the author projected to the three fields a comment needs.
+    /// `as one author` is the belongs-to eager load: one query, no N+1,
+    /// and the author projected to the three fields a comment needs.
     function list_by_task(task_id: int, cursor: text?, size: int) {
         return select C from App.public.Comments
             inner join App.public.Users U on U.id == C.author_id as one author
-            where task_id == $task_id
-            as { id, task_id, body, created_at, author: { id, email, name } }
+            where C.task_id == @task_id
+            as {
+                C.id,
+                C.task_id,
+                C.body,
+                C.created_at,
+                author: { U.id, U.email, U.name }
+            }
             orderby C.created_at asc, C.id asc
-            page after $cursor size $size;
+            page after @cursor size @size;
     }
 }
 
 service ActivityService {
-    --- Append-only, and best-effort by design: an activity row that fails
-    --- to write must not fail the action it describes. The caller runs it
-    --- outside whatever transaction it was recording.
+    /// Append-only, and best-effort by design: an activity row that fails
+    /// to write must not fail the action it describes. The caller runs it
+    /// outside whatever transaction it was recording.
     function record(project_id: int, actor_id: int, kind: text, payload: jsonb) {
-        insert into App.public.Activities {
-            project_id = $project_id,
-            actor_id   = $actor_id,
-            type       = $kind,
-            payload    = $payload,
+        insert Activities into App.public.Activities {
+            project_id = @project_id,
+            actor_id   = @actor_id,
+            type       = @kind,
+            payload    = @payload,
             created_at = date.now()
         };
     }
@@ -69,30 +82,44 @@ service ActivityService {
     function list_by_project(project_id: int) {
         return select A from App.public.Activities
             inner join App.public.Users U on U.id == A.actor_id as one actor
-            where project_id == $project_id
-            as { id, project_id, type, payload, created_at, actor: { id, name } }
+            where A.project_id == @project_id
+            as {
+                A.id,
+                A.project_id,
+                A.type,
+                A.payload,
+                A.created_at,
+                actor: { U.id, U.name }
+            }
             orderby A.created_at desc
             limit 50;
     }
 }
 
 service StatsService {
-    --- Three grouped aggregates. `count(id)` rather than `count(*)`:
-    --- 1.0 counts a column, and the primary key is never null.
+    /// Three grouped aggregates. `count(id)` rather than `count(*)`:
+    /// 1.0 counts a column, and the primary key is never null.
     function by_status(project_id: int) {
         return select T from App.public.Tasks
-            where project_id == $project_id
-            group by status
-            as { status, total: count(id) }
-            orderby status asc;
+            where T.project_id == @project_id
+            group by T.status
+            as {
+                T.status,
+                total: count(T.id)
+            }
+            orderby T.status asc;
     }
 
     function by_column(project_id: int) {
         return select T from App.public.Tasks
             inner join App.public.Columns C on C.id == T.column_id as group
-            where T.project_id == $project_id
+            where T.project_id == @project_id
             group by T.column_id, C.name
-            as { column_id: T.column_id, column_name: C.name, total: count(T.id) }
+            as {
+                column_id: T.column_id,
+                column_name: C.name,
+                total: count(T.id)
+            }
             orderby T.column_id asc;
     }
 
@@ -100,9 +127,13 @@ service StatsService {
         return select TA from App.public.TaskAssignees
             inner join App.public.Tasks T on T.id == TA.task_id as group
             inner join App.public.Users U on U.id == TA.user_id as group
-            where T.project_id == $project_id
+            where T.project_id == @project_id
             group by TA.user_id, U.name
-            as { user_id: TA.user_id, user_name: U.name, total: count.distinct(TA.id) }
+            as {
+                user_id: TA.user_id,
+                user_name: U.name,
+                total: count.distinct(TA.id)
+            }
             orderby TA.user_id asc;
     }
 }
